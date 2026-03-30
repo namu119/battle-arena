@@ -149,6 +149,7 @@ class BehaviorTree {
   getEnemies() {
     return this.state.characters.filter(
       c => c.team !== this.char.team && c.alive
+        && (this.char.zoneId == null || c.zoneId == null || c.zoneId === this.char.zoneId)
     );
   }
 

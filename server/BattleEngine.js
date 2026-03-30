@@ -7,12 +7,15 @@ const MAX_TICKS = 300; // 60초 제한
 const DAMAGE_SCALE = 0.35; // 글로벌 데미지 감쇄
 
 class BattleEngine {
-  constructor(players) {
+  constructor(players, options = {}) {
     this.tick = 0;
     this.characters = [];
     this.log = [];
     this.finished = false;
     this.results = null;
+    this.maxTicks = options.maxTicks || MAX_TICKS;
+    this.finishCondition = options.finishCondition || 'lastStanding';
+    this.pendingCharacters = [];
 
     this.initCharacters(players);
   }
@@ -21,27 +24,49 @@ class BattleEngine {
   initCharacters(players) {
     const spacing = ARENA_WIDTH / (players.length + 1);
 
-    this.characters = players.map((build, i) => ({
-      id: `p${i}`,
-      name: build.playerName || `Player${i + 1}`,
-      team: i, // FFA (개인전)
-      className: build.className,
-      passive: build.passive,
-      stats: { ...build.stats },
-      hp: build.stats.maxHP,
-      range: build.range,
-      btWeights: { ...build.btWeights },
-      skills: build.skills.map(s => ({ ...s, currentCooldown: 0 })),
-      x: spacing * (i + 1),
-      y: ARENA_HEIGHT / 2,
-      buffs: [],
-      alive: true,
-    }));
+    this.characters = players.map((build, i) => {
+      const stats = { ...build.stats };
+      return {
+        id: build.id || `p${i}`,
+        name: build.playerName || `Player${i + 1}`,
+        team: build.team != null ? build.team : i, // FFA (개인전) or custom team
+        className: build.className,
+        passive: build.passive,
+        stats,
+        baseStats: { ...stats }, // snapshot for recalcStats
+        equipmentBonuses: { ATK: 0, DEF: 0, INT: 0, SPD: 0 },
+        enhancementLevels: { helmet: 0, armor: 0, weapon: 0, boots: 0 },
+        hp: stats.maxHP,
+        range: build.range,
+        btWeights: { ...build.btWeights },
+        skills: (build.skills || []).map(s => ({ ...s, currentCooldown: 0 })),
+        x: build.x != null ? build.x : spacing * (i + 1),
+        y: build.y != null ? build.y : ARENA_HEIGHT / 2,
+        zoneId: build.zoneId != null ? build.zoneId : null,
+        buffs: [],
+        alive: true,
+        gold: 0,
+      };
+    });
   }
 
   /** 전투 전체 실행 (서버 시뮬레이션) */
+  /** 중간에 캐릭터 추가 (다음 틱 시작 시 반영) */
+  addCharacter(charData) {
+    this.pendingCharacters.push({
+      ...charData,
+      buffs: charData.buffs || [],
+      alive: true,
+      baseStats: charData.baseStats || { ...charData.stats },
+      equipmentBonuses: charData.equipmentBonuses || { ATK: 0, DEF: 0, INT: 0, SPD: 0 },
+      enhancementLevels: charData.enhancementLevels || { helmet: 0, armor: 0, weapon: 0, boots: 0 },
+      gold: charData.gold || 0,
+      skills: (charData.skills || []).map(s => ({ ...s, currentCooldown: s.currentCooldown || 0 })),
+    });
+  }
+
   run() {
-    while (!this.finished && this.tick < MAX_TICKS) {
+    while (!this.finished && this.tick < this.maxTicks) {
       this.processTick();
     }
 
@@ -57,6 +82,12 @@ class BattleEngine {
   processTick() {
     this.tick++;
     this.tickEvents = [];
+
+    // Flush pending characters (added via addCharacter)
+    if (this.pendingCharacters.length > 0) {
+      this.characters.push(...this.pendingCharacters);
+      this.pendingCharacters = [];
+    }
 
     const aliveChars = this.characters.filter(c => c.alive);
 
@@ -74,10 +105,12 @@ class BattleEngine {
       this.updateBuffs(char);
     }
 
-    // 생존자 체크
-    const alive = this.characters.filter(c => c.alive);
-    if (alive.length <= 1) {
-      this.finishBattle(alive);
+    // 생존자 체크 (external 모드에서는 스킵 - 오케스트레이터가 관리)
+    if (this.finishCondition === 'lastStanding') {
+      const alive = this.characters.filter(c => c.alive);
+      if (alive.length <= 1) {
+        this.finishBattle(alive);
+      }
     }
 
     this.log.push({
@@ -172,9 +205,10 @@ class BattleEngine {
     switch (skillData.type) {
       case 'attack': {
         if (skillData.aoe) {
-          // 범위 공격
+          // 범위 공격 (존 필터 포함)
           const nearby = this.characters.filter(
             c => c.team !== caster.team && c.alive && this.getDistance(caster, c) <= 150
+              && (caster.zoneId == null || c.zoneId == null || c.zoneId === caster.zoneId)
           );
           const dmg = (skillData.damage + caster.stats.INT * 2) * DAMAGE_SCALE;
           for (const t of nearby) {
@@ -274,7 +308,8 @@ class BattleEngine {
     if (target.hp <= 0 && target.alive) {
       target.alive = false;
       target.deathTick = this.tick;
-      if (tickEvents) tickEvents.push({ type: 'death', target: target.id });
+      target.killedBy = attackerId;
+      if (tickEvents) tickEvents.push({ type: 'death', target: target.id, killedBy: attackerId });
     }
   }
 

@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const path = require('path');
 const { BattleEngine, TICK_INTERVAL } = require('./BattleEngine');
 const { calculateRewards } = require('./Reward');
+const { SurvivalArena } = require('./SurvivalArena');
 
 const classes = require('../data/classes.json');
 const equipments = require('../data/equipments.json');
@@ -200,6 +201,43 @@ io.on('connection', (socket) => {
     } catch (e) {
       console.error('AI전투 에러:', e);
       socket.emit('error', '전투 시작 실패: ' + e.message);
+    }
+  });
+
+  // Survival Arena 모드 (솔로 vs AI 3명)
+  socket.on('startSurvival', (build) => {
+    try {
+      const playerName = build.playerName || 'Player';
+      build.playerName = playerName;
+
+      // AI 3명 생성
+      const aiBots = [generateAIBuild(0), generateAIBuild(1), generateAIBuild(2)];
+      const allBuilds = [build, ...aiBots];
+
+      console.log(`서바이벌 시작: ${playerName} vs ${aiBots.map(b => b.playerName + '(' + b.className + ')').join(', ')}`);
+
+      const arena = new SurvivalArena(allBuilds);
+      const { log, results } = arena.run();
+
+      socket.emit('survivalStart', {
+        totalTicks: log.length,
+        zones: [0, 1, 2, 3],
+        playerZone: 0,
+      });
+
+      let tickIndex = 0;
+      const interval = setInterval(() => {
+        if (tickIndex >= log.length) {
+          clearInterval(interval);
+          socket.emit('survivalEnd', { results });
+          return;
+        }
+        socket.emit('survivalTick', log[tickIndex]);
+        tickIndex++;
+      }, TICK_INTERVAL);
+    } catch (e) {
+      console.error('서바이벌 에러:', e);
+      socket.emit('error', '서바이벌 시작 실패: ' + e.message);
     }
   });
 

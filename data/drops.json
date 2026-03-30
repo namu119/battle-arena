@@ -1,0 +1,52 @@
+{
+  "dropTables": {
+    "1": {
+      "description": "Lv1 몬스터 드랍",
+      "guaranteed": true,
+      "slots": ["helmet", "armor", "weapon", "boots"],
+      "statBonus": { "min": 1, "max": 1 },
+      "goldOnOverflow": 30
+    },
+    "2": {
+      "description": "Lv2 몬스터 드랍",
+      "guaranteed": true,
+      "slots": ["helmet", "armor", "weapon", "boots"],
+      "statBonus": { "min": 1, "max": 2 },
+      "goldOnOverflow": 50
+    },
+    "3": {
+      "description": "Lv3 몬스터 드랍",
+      "guaranteed": true,
+      "slots": ["helmet", "armor", "weapon", "boots"],
+      "statBonus": { "min": 1, "max": 3 },
+      "goldOnOverflow": 80
+    },
+    "4": {
+      "description": "Lv4 몬스터 드랍",
+      "guaranteed": true,
+      "slots": ["helmet", "armor", "weapon", "boots"],
+      "statBonus": { "min": 2, "max": 3 },
+      "goldOnOverflow": 100
+    }
+  },
+  "enhancement": {
+    "maxLevel": 10,
+    "goldAutoEnhanceCost": 200,
+    "goldAutoEnhanceBonus": { "min": 1, "max": 2 }
+  },
+  "waveSchedule": {
+    "phase1": [
+      { "wave": 1, "tick": 1, "monstersPerZone": [{"type": "lv1", "count": 3}] },
+      { "wave": 2, "tick": 100, "monstersPerZone": [{"type": "lv2", "count": 3}] },
+      { "wave": 3, "tick": 200, "monstersPerZone": [{"type": "lv3", "count": 2}, {"type": "lv4", "count": 1}] }
+    ],
+    "phase2": [
+      { "wave": 4, "tick": 350, "monstersPerZone": [{"type": "lv3", "count": 2}, {"type": "lv4", "count": 1}] },
+      { "wave": 5, "tick": 500, "monstersPerZone": [{"type": "lv4", "count": 2}] }
+    ],
+    "phase3": [
+      { "wave": 6, "tick": 700, "monstersPerZone": [{"type": "lv4", "count": 2}] },
+      { "wave": 7, "tick": 850, "monstersPerZone": [{"type": "lv4", "count": 3}] }
+    ]
+  }
+}

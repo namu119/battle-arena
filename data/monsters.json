@@ -1,0 +1,100 @@
+{
+  "lv1_slime": {
+    "name": "슬라임",
+    "level": 1,
+    "hp": 50,
+    "atk": 4,
+    "def": 1,
+    "spd": 3,
+    "range": 50,
+    "btWeights": { "survive": 10, "skill": 10, "attack": 80 },
+    "skills": []
+  },
+  "lv1_goblin": {
+    "name": "고블린",
+    "level": 1,
+    "hp": 40,
+    "atk": 5,
+    "def": 1,
+    "spd": 4,
+    "range": 50,
+    "btWeights": { "survive": 5, "skill": 5, "attack": 90 },
+    "skills": []
+  },
+  "lv2_wolf": {
+    "name": "늑대",
+    "level": 2,
+    "hp": 120,
+    "atk": 10,
+    "def": 4,
+    "spd": 6,
+    "range": 50,
+    "btWeights": { "survive": 10, "skill": 10, "attack": 80 },
+    "skills": []
+  },
+  "lv2_skeleton": {
+    "name": "해골전사",
+    "level": 2,
+    "hp": 100,
+    "atk": 12,
+    "def": 6,
+    "spd": 4,
+    "range": 60,
+    "btWeights": { "survive": 20, "skill": 20, "attack": 60 },
+    "skills": [
+      { "name": "뼈던지기", "type": "attack", "damage": 15, "cooldown": 5, "description": "원거리 뼈 투척" }
+    ]
+  },
+  "lv3_orc": {
+    "name": "오크전사",
+    "level": 3,
+    "hp": 130,
+    "atk": 11,
+    "def": 6,
+    "spd": 4,
+    "range": 60,
+    "btWeights": { "survive": 15, "skill": 25, "attack": 60 },
+    "skills": [
+      { "name": "전쟁함성", "type": "buff", "damage": 0, "duration": 5, "cooldown": 10, "description": "자신을 강화" }
+    ]
+  },
+  "lv3_mage_ghost": {
+    "name": "유령마법사",
+    "level": 3,
+    "hp": 90,
+    "atk": 7,
+    "def": 2,
+    "spd": 4,
+    "range": 150,
+    "btWeights": { "survive": 20, "skill": 60, "attack": 20 },
+    "skills": [
+      { "name": "어둠화살", "type": "attack", "damage": 20, "cooldown": 6, "description": "마법 투사체" }
+    ]
+  },
+  "lv4_troll": {
+    "name": "트롤",
+    "level": 4,
+    "hp": 180,
+    "atk": 14,
+    "def": 8,
+    "spd": 3,
+    "range": 60,
+    "btWeights": { "survive": 25, "skill": 15, "attack": 60 },
+    "skills": [
+      { "name": "분쇄타격", "type": "attack", "damage": 35, "cooldown": 8, "description": "강력한 일격" }
+    ]
+  },
+  "lv4_dragon_whelp": {
+    "name": "드래곤새끼",
+    "level": 4,
+    "hp": 150,
+    "atk": 12,
+    "def": 6,
+    "spd": 5,
+    "range": 100,
+    "btWeights": { "survive": 15, "skill": 50, "attack": 35 },
+    "skills": [
+      { "name": "화염숨결", "type": "attack", "damage": 25, "aoe": true, "cooldown": 10, "description": "범위 화염" }
+    ]
+  }
+}

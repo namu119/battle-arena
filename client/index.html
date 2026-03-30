@@ -182,6 +182,44 @@
     .hp-text { font-size: 0.8em; color: #aaa; }
     .char-name { font-size: 0.9em; font-weight: bold; }
 
+    /* 서바이벌 */
+    #survival-screen {
+      display: none;
+      width: 100%;
+      min-height: 100vh;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 20px;
+      padding-top: 10px;
+    }
+    #survival-canvas {
+      background: #0f3460;
+      border: 2px solid #e94560;
+      border-radius: 8px;
+      width: 100%;
+      max-width: 800px;
+      height: auto;
+      aspect-ratio: 2 / 1;
+      display: block;
+    }
+    .survival-notify-item {
+      background: rgba(15,52,96,0.9);
+      border: 1px solid #7ec8e3;
+      border-radius: 6px;
+      padding: 6px 12px;
+      margin-bottom: 4px;
+      font-size: 0.85em;
+      color: #7ec8e3;
+      animation: fadeInOut 2s forwards;
+    }
+    @keyframes fadeInOut {
+      0% { opacity: 0; transform: translateX(20px); }
+      15% { opacity: 1; transform: translateX(0); }
+      70% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
     /* 결과 */
     .result-card {
       background: #16213e;
@@ -294,6 +332,7 @@
       <button class="btn" onclick="createRoom()">방 만들기</button>
       <button class="btn btn-secondary" onclick="refreshRooms()">방 목록</button>
       <button class="btn" onclick="soloMode()" style="background:#0f3460;border:1px solid #7ec8e3">혼자 연습 (vs AI)</button>
+      <button class="btn" onclick="survivalMode()" style="background:#2d1b69;border:1px solid #e94560">서바이벌 아레나</button>
     </div>
     <div id="roomList"></div>
   </div>
@@ -343,6 +382,7 @@
     <div style="margin: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
       <button class="btn" id="submitBtn" onclick="submitBuild()" disabled style="display:none">출전!</button>
       <button class="btn" id="aiBtn" onclick="fightAI()" disabled style="background:#0f3460;border:1px solid #7ec8e3;display:none">AI와 전투</button>
+      <button class="btn" id="survivalBtn" onclick="startSurvival()" disabled style="background:#2d1b69;border:1px solid #e94560;display:none">서바이벌 시작</button>
       <div class="player-list" id="playerList"></div>
     </div>
   </div>
@@ -353,6 +393,20 @@
     <div class="hp-bars" id="hpBars"></div>
     <canvas id="battle-canvas"></canvas>
     <div id="tickInfo" style="margin:10px;color:#aaa"></div>
+  </div>
+
+  <!-- 서바이벌 전투 화면 -->
+  <div id="survival-screen">
+    <div id="survivalHud" style="display:flex;gap:15px;margin:10px;flex-wrap:wrap;align-items:center;justify-content:center;max-width:820px">
+      <div style="color:#e94560;font-weight:bold;font-size:1.2em" id="survivalTimer">5:00</div>
+      <div style="color:#f0a500" id="survivalPhase">Phase 1 - PvE</div>
+      <div style="color:#f0a500" id="survivalGold">💰 0G</div>
+      <div style="color:#7ec8e3;font-size:0.9em" id="survivalEnhance">🔨 0/0/0/0</div>
+    </div>
+    <div id="survivalNotify" style="position:fixed;top:60px;right:20px;z-index:100"></div>
+    <canvas id="survival-canvas"></canvas>
+    <div class="hp-bars" id="survivalHpBars"></div>
+    <div id="survivalTickInfo" style="margin:10px;color:#aaa"></div>
   </div>
 
   <!-- 결과 화면 -->
@@ -405,10 +459,11 @@
     const INITIAL_GOLD = 1000;
     const STAT_POINTS = 10;
     let soloPlay = false;
+    let survivalPlay = false;
 
     // ─── 화면 전환 ───
     function showScreen(id) {
-      document.querySelectorAll('#lobby,#workshop,#battle-screen,#result-screen').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('#lobby,#workshop,#battle-screen,#result-screen,#survival-screen').forEach(el => el.classList.remove('active'));
       document.getElementById(id).classList.add('active');
     }
 
@@ -442,12 +497,39 @@
       if (!dataLoaded) return;
       myName = document.getElementById('playerName').value.trim() || `전사${Math.floor(Math.random()*999)}`;
       soloPlay = true;
+      survivalPlay = false;
       showScreen('workshop');
       initWorkshop();
-      // 솔로: AI버튼만 표시
       document.getElementById('submitBtn').style.display = 'none';
       document.getElementById('aiBtn').style.display = '';
+      document.getElementById('survivalBtn').style.display = 'none';
       document.getElementById('playerList').innerHTML = '<b>솔로 모드</b><div class="player-entry player-ready">vs AI 3명</div>';
+    }
+
+    function survivalMode() {
+      if (!dataLoaded) return;
+      myName = document.getElementById('playerName').value.trim() || `전사${Math.floor(Math.random()*999)}`;
+      soloPlay = false;
+      survivalPlay = true;
+      showScreen('workshop');
+      initWorkshop();
+      document.getElementById('submitBtn').style.display = 'none';
+      document.getElementById('aiBtn').style.display = 'none';
+      document.getElementById('survivalBtn').style.display = '';
+      document.getElementById('playerList').innerHTML = '<b>서바이벌 아레나</b><div class="player-entry player-ready">PvE → PvP (5분)</div>';
+    }
+
+    function startSurvival() {
+      try {
+        const build = makeBuild();
+        if (!build) return;
+        build.playerName = myName;
+        socket.emit('startSurvival', build);
+        document.getElementById('survivalBtn').disabled = true;
+        document.getElementById('survivalBtn').textContent = '매칭중...';
+      } catch (e) {
+        alert('빌드 생성 실패: ' + e.message);
+      }
     }
 
     socket.on('joinedRoom', ({ roomId, players }) => {
@@ -621,6 +703,7 @@
         && cost <= INITIAL_GOLD;
       document.getElementById('submitBtn').disabled = !valid;
       document.getElementById('aiBtn').disabled = !valid;
+      document.getElementById('survivalBtn').disabled = !valid;
     }
 
     function getTotalCost() {
@@ -1336,13 +1419,325 @@
 
     function backToWorkshop() {
       isBattleActive = false;
+      isSurvivalActive = false;
       if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
+      if (survivalAnimFrameId) { cancelAnimationFrame(survivalAnimFrameId); survivalAnimFrameId = null; }
       animations = [];
       deathAnims.clear();
       deadAnimated.clear();
-      showScreen(soloPlay ? 'lobby' : 'workshop');
-      if (!soloPlay) initWorkshop();
+      survivalAnimations = [];
+      showScreen((soloPlay || survivalPlay) ? 'lobby' : 'workshop');
+      if (!soloPlay && !survivalPlay) initWorkshop();
     }
+
+    // ═══ SURVIVAL ARENA ═══
+    const survivalCanvas = document.getElementById('survival-canvas');
+    const sCtx = survivalCanvas ? survivalCanvas.getContext('2d') : null;
+    let survivalChars = [];
+    let survivalAnimations = [];
+    let survivalAnimFrameId = null;
+    let isSurvivalActive = false;
+    let survivalPhase = 1;
+    let survivalActiveZones = [0,1,2,3];
+    const survivalDeadAnimated = new Set();
+    const survivalDeathAnims = new Map();
+    const ZONE_COLORS = ['#e94560','#7b2ff7','#2ecc71','#f39c12'];
+    const ZONE_LABELS = ['A','B','C','D'];
+
+    function resizeSurvivalCanvas() {
+      if (!survivalCanvas) return;
+      const w = Math.min(800, survivalCanvas.parentElement.clientWidth - 20);
+      survivalCanvas.width = w;
+      survivalCanvas.height = Math.round(w * 0.5);
+    }
+    if (survivalCanvas) {
+      resizeSurvivalCanvas();
+      window.addEventListener('resize', () => {
+        resizeSurvivalCanvas();
+        if (survivalChars.length > 0 && !isSurvivalActive) renderSurvivalFrame();
+      });
+    }
+
+    function drawSurvivalField(W, H) {
+      sCtx.fillStyle = '#0a0a1e';
+      sCtx.fillRect(0, 0, W, H);
+
+      // Draw zone quadrants
+      const zoneRects = [
+        { x:0, y:0, w:W/2, h:H/2 },
+        { x:W/2, y:0, w:W/2, h:H/2 },
+        { x:0, y:H/2, w:W/2, h:H/2 },
+        { x:W/2, y:H/2, w:W/2, h:H/2 },
+      ];
+      for (let i = 0; i < 4; i++) {
+        const r = zoneRects[i];
+        const active = survivalActiveZones.includes(i);
+        sCtx.fillStyle = active ? '#0f2847' : '#080818';
+        sCtx.fillRect(r.x+1, r.y+1, r.w-2, r.h-2);
+
+        // Zone border
+        sCtx.strokeStyle = active ? '#1a3a5c' : '#0a0a15';
+        sCtx.lineWidth = 1;
+        sCtx.strokeRect(r.x, r.y, r.w, r.h);
+
+        // Zone label
+        sCtx.fillStyle = active ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.05)';
+        sCtx.font = `bold ${Math.round(W*0.04)}px sans-serif`;
+        sCtx.textAlign = 'center';
+        sCtx.fillText(ZONE_LABELS[i], r.x + r.w/2, r.y + r.h/2 + W*0.015);
+      }
+
+      // Phase indicator line
+      if (survivalPhase >= 2) {
+        // Horizontal merge line removed (zones 0+1, 2+3)
+        sCtx.strokeStyle = '#e94560';
+        sCtx.lineWidth = 2;
+        sCtx.setLineDash([4,4]);
+        if (survivalPhase === 2) {
+          sCtx.beginPath();
+          sCtx.moveTo(0, H/2); sCtx.lineTo(W, H/2);
+          sCtx.stroke();
+        }
+        sCtx.setLineDash([]);
+      }
+    }
+
+    function serverToSurvivalView(serverX, charIdx, totalChars, W, H) {
+      const qvX = (serverX / 800) * W;
+      const spread = totalChars > 1 ? (charIdx / (totalChars - 1)) : 0.5;
+      const qvY = H * 0.15 + spread * H * 0.7;
+      return { qvX, qvY };
+    }
+
+    function renderSurvivalFrame() {
+      if (!sCtx) return;
+      const W = survivalCanvas.width;
+      const H = survivalCanvas.height;
+      const now = performance.now();
+
+      sCtx.clearRect(0, 0, W, H);
+      drawSurvivalField(W, H);
+
+      // Sort and draw characters
+      const chars = survivalChars.filter(c => c.alive || survivalDeathAnims.has(c.id));
+      const totalChars = chars.length;
+
+      // Sort by y for painter's algorithm
+      const toDraw = chars.map((c, idx) => {
+        const { qvX, qvY } = serverToSurvivalView(c.x, idx, totalChars, W, H);
+        return { char: c, qvX, qvY };
+      }).sort((a, b) => a.qvY - b.qvY);
+
+      for (const { char, qvX, qvY } of toDraw) {
+        const scale = char.isMonster ? 0.6 : 0.8;
+        let deathProgress;
+        const da = survivalDeathAnims.get(char.id);
+        if (da) {
+          const dt = (now - da.born) / da.duration;
+          if (dt < 1) deathProgress = dt;
+        }
+
+        if (char.isMonster) {
+          // Draw monster as triangle
+          drawMonster(sCtx, char, qvX, qvY, scale, deathProgress);
+        } else {
+          drawCharacter(sCtx, char, qvX, qvY, scale, deathProgress);
+        }
+      }
+
+      // Draw animations
+      for (let i = survivalAnimations.length - 1; i >= 0; i--) {
+        const anim = survivalAnimations[i];
+        if (now - anim.born > anim.duration) {
+          survivalAnimations.splice(i, 1);
+          continue;
+        }
+        drawEffect(sCtx, anim, now);
+      }
+    }
+
+    function drawMonster(ctx, char, qvX, qvY, scale, deathProgress) {
+      const size = 10 * scale;
+      ctx.save();
+      ctx.translate(qvX, qvY);
+
+      if (deathProgress !== undefined) {
+        ctx.globalAlpha = Math.max(0, 1 - deathProgress);
+        ctx.scale(1 - deathProgress * 0.7, 1 - deathProgress * 0.7);
+      } else if (!char.alive) {
+        ctx.globalAlpha = 0.2;
+      }
+
+      // Shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, size, size * 0.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Monster body (inverted triangle - menacing)
+      const lvColor = char.level >= 4 ? '#ff4444' : char.level >= 3 ? '#ff8800' : char.level >= 2 ? '#ffcc00' : '#88cc44';
+      ctx.fillStyle = lvColor;
+      ctx.beginPath();
+      ctx.moveTo(-size, -size * 1.5);
+      ctx.lineTo(size, -size * 1.5);
+      ctx.lineTo(0, size * 0.3);
+      ctx.closePath();
+      ctx.fill();
+
+      // Eyes
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(-size * 0.3, -size * 0.8, size * 0.15, 0, Math.PI * 2);
+      ctx.arc(size * 0.3, -size * 0.8, size * 0.15, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+
+      // Level label
+      if (deathProgress === undefined || deathProgress < 0.5) {
+        ctx.fillStyle = '#aaa';
+        ctx.font = `${Math.max(7, Math.round(8 * scale))}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.globalAlpha = deathProgress !== undefined ? Math.max(0, 1 - deathProgress) : (char.alive ? 0.7 : 0.2);
+        ctx.fillText(`Lv${char.level || '?'}`, qvX, qvY + size * 1.2);
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    function survivalAnimLoop() {
+      renderSurvivalFrame();
+      if (isSurvivalActive) {
+        survivalAnimFrameId = requestAnimationFrame(survivalAnimLoop);
+      }
+    }
+
+    function survivalNotify(text, color) {
+      const el = document.getElementById('survivalNotify');
+      if (!el) return;
+      const item = document.createElement('div');
+      item.className = 'survival-notify-item';
+      item.style.color = color || '#7ec8e3';
+      item.style.borderColor = color || '#7ec8e3';
+      item.textContent = text;
+      el.appendChild(item);
+      setTimeout(() => item.remove(), 2100);
+    }
+
+    // ─── Survival Socket Events ───
+    socket.on('survivalStart', ({ totalTicks }) => {
+      showScreen('survival-screen');
+      resizeSurvivalCanvas();
+      survivalChars = [];
+      survivalAnimations = [];
+      survivalDeathAnims.clear();
+      survivalDeadAnimated.clear();
+      survivalPhase = 1;
+      survivalActiveZones = [0,1,2,3];
+      isSurvivalActive = true;
+      document.getElementById('survivalTickInfo').textContent = `총 ${totalTicks}틱`;
+      survivalAnimFrameId = requestAnimationFrame(survivalAnimLoop);
+    });
+
+    socket.on('survivalTick', (data) => {
+      survivalChars = data.state;
+      survivalPhase = data.phase || 1;
+      survivalActiveZones = data.activeZones || [0,1,2,3];
+
+      // Update HUD
+      const player = survivalChars.find(c => c.id === 'p0');
+      if (player) {
+        document.getElementById('survivalGold').textContent = `💰 ${player.gold || 0}G`;
+        const enh = player.enhancementLevels;
+        if (enh) document.getElementById('survivalEnhance').textContent = `🔨 ${enh.helmet}/${enh.armor}/${enh.weapon}/${enh.boots}`;
+      }
+
+      const elapsed = (data.tick || 0) * 0.2;
+      const remaining = Math.max(0, 300 - elapsed);
+      const min = Math.floor(remaining / 60);
+      const sec = Math.floor(remaining % 60);
+      document.getElementById('survivalTimer').textContent = `${min}:${sec.toString().padStart(2,'0')}`;
+
+      const phaseLabels = { 1: 'Phase 1 - PvE', 2: 'Phase 2 - 합류', 3: 'Phase 3 - FFA' };
+      document.getElementById('survivalPhase').textContent = phaseLabels[survivalPhase] || '';
+
+      if (data.tick) document.getElementById('survivalTickInfo').textContent = `틱: ${data.tick}`;
+
+      // HP bars
+      const players = survivalChars.filter(c => !c.isMonster);
+      const hpEl = document.getElementById('survivalHpBars');
+      hpEl.innerHTML = players.map(c => {
+        const pct = Math.max(0, c.hp / c.maxHP * 100);
+        const color = c.alive ? (classColors[c.className] || '#e94560') : '#555';
+        const zone = c.zoneId != null ? ` [${ZONE_LABELS[c.zoneId]}]` : '';
+        return `<div class="hp-bar-container">
+          <div class="char-name" style="color:${color}">${esc(c.name)}${zone}</div>
+          <div class="hp-bar-bg"><div class="hp-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+          <div class="hp-text">${c.hp}/${c.maxHP}</div>
+        </div>`;
+      }).join('');
+
+      // Process events
+      const events = data.events || [];
+      for (const evt of events) {
+        if (evt.type === 'damage' && evt.amount > 0) {
+          const target = survivalChars.find(c => c.id === evt.to);
+          if (target) {
+            const { qvX, qvY } = serverToSurvivalView(target.x, 0, 1, survivalCanvas.width, survivalCanvas.height);
+            survivalAnimations.push({ type:'damage', x:qvX, y:qvY-15, startY:qvY-15, amount:evt.amount, isSkill:!!evt.skill, born:performance.now(), duration:1000 });
+          }
+        }
+        if (evt.type === 'death' && !survivalDeadAnimated.has(evt.target)) {
+          survivalDeadAnimated.add(evt.target);
+          const c = survivalChars.find(ch => ch.id === evt.target);
+          if (c) {
+            const { qvX, qvY } = serverToSurvivalView(c.x, 0, 1, survivalCanvas.width, survivalCanvas.height);
+            survivalDeathAnims.set(evt.target, { born:performance.now(), duration:800 });
+            if (!c.isMonster) survivalNotify(`${c.name} 사망!`, '#e94560');
+          }
+        }
+        if (evt.type === 'drop') {
+          const slotNames = { helmet:'투구', armor:'갑옷', weapon:'무기', boots:'신발' };
+          if (evt.dropType === 'enhancement') {
+            survivalNotify(`${slotNames[evt.slot] || evt.slot} +${evt.level} 강화!`, '#f0a500');
+          } else if (evt.dropType === 'goldOverflow') {
+            survivalNotify(`+${evt.gold}G (${slotNames[evt.slot]} MAX)`, '#f0a500');
+          } else if (evt.dropType === 'goldEnhance') {
+            survivalNotify(`골드 강화: ${slotNames[evt.slot]} +${evt.level}`, '#7ec8e3');
+          }
+        }
+        if (evt.type === 'waveSpawn') {
+          survivalNotify(`⚔ Wave ${evt.count > 20 ? '대규모' : ''} 몬스터 출현!`, '#ff6644');
+        }
+        if (evt.type === 'zoneMerge') {
+          survivalNotify(`🔥 존 합류! Phase ${evt.phase}`, '#e94560');
+        }
+      }
+    });
+
+    socket.on('survivalEnd', ({ results }) => {
+      isSurvivalActive = false;
+      if (survivalAnimFrameId) { cancelAnimationFrame(survivalAnimFrameId); survivalAnimFrameId = null; }
+      survivalAnimations = [];
+      survivalDeathAnims.clear();
+      survivalDeadAnimated.clear();
+
+      showScreen('result-screen');
+      const el = document.getElementById('resultCards');
+      el.innerHTML = results.map(r => {
+        const rankClass = r.rank <= 3 ? `rank-${r.rank}` : '';
+        const enh = r.enhancementLevels || {};
+        const enhTotal = Object.values(enh).reduce((a,b)=>a+b, 0);
+        return `<div class="result-card">
+          <div class="rank ${rankClass}">${r.rank}등</div>
+          <div>
+            <div style="font-weight:bold">${esc(r.name)} (${esc(r.className)})</div>
+            <div style="color:#aaa">HP: ${r.hpRemaining} | 킬: ${r.monstersKilled || 0}마리</div>
+            <div style="color:#f0a500">강화 Lv${enhTotal} (${enh.helmet||0}/${enh.armor||0}/${enh.weapon||0}/${enh.boots||0})</div>
+            <div style="color:#f0a500">+${r.gold || 0}G</div>
+          </div>
+        </div>`;
+      }).join('');
+    });
 
     socket.on('error', (msg) => alert(msg));
   </script>
