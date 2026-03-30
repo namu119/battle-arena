@@ -26,8 +26,8 @@ class BehaviorTree {
       if (action) return action;
     }
 
-    // 폴백: 이동
-    return { type: 'move', direction: 'forward' };
+    // 폴백: 적 없으면 제자리 대기 (구석 박힘/중앙 몰림 방지)
+    return { type: 'idle' };
   }
 
   /** 각 브랜치 점수 계산 */

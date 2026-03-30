@@ -149,14 +149,29 @@ class SurvivalArena {
         if (this.activeZones.size <= 2) this.phase = 2;
         if (this.activeZones.size <= 1) this.phase = 3;
 
-        // Phase 2: reassign zoneIds and reposition with correct expanded bounds
+        // Phase 2: reassign zoneIds and reposition - spread evenly for PvP engagement
         for (const [from, to] of merge.merges) {
           const toBounds = this._getExpandedBounds(to);
+          const charsToMove = this.engine.characters.filter(c => c.zoneId === from && c.alive);
+          const existingChars = this.engine.characters.filter(c => c.zoneId === to && c.alive && !c.isMonster);
+
           for (const char of this.engine.characters) {
             if (char.zoneId === from) {
               char.zoneId = to;
-              char.x = toBounds.minX + Math.random() * (toBounds.maxX - toBounds.minX);
             }
+          }
+
+          // Spread ALL alive non-monster chars in merged zone evenly
+          const allPlayers = this.engine.characters.filter(c => c.zoneId === to && c.alive && !c.isMonster);
+          const spacing = (toBounds.maxX - toBounds.minX) / (allPlayers.length + 1);
+          allPlayers.forEach((p, i) => {
+            p.x = toBounds.minX + spacing * (i + 1);
+          });
+
+          // Spread monsters randomly in merged zone
+          const monsters = this.engine.characters.filter(c => c.zoneId === to && c.alive && c.isMonster);
+          for (const m of monsters) {
+            m.x = toBounds.minX + Math.random() * (toBounds.maxX - toBounds.minX);
           }
         }
 

@@ -141,6 +141,9 @@ class BattleEngine {
       case 'move':
         this.doMove(char, action);
         break;
+      case 'idle':
+        // 적 없으면 대기 (이동 안 함)
+        break;
     }
   }
 
