@@ -63,19 +63,19 @@ console.log('\n[Test 2] 서바이벌 아레나 풀 매치');
   assert(results.filter(r => r.alive).length >= 1, '최소 1명 생존');
 }
 
-// ─── Test 3: Zone Merges ───
-console.log('\n[Test 3] 존 합류');
+// ─── Test 3: Game Flow (Open PvP) ───
+console.log('\n[Test 3] 오픈 PvP 게임 흐름');
 {
-  // Run multiple matches to check zone merge frequency
-  let mergeAt300Count = 0;
+  let totalTicks = 0;
   const runs = 10;
   for (let i = 0; i < runs; i++) {
     const arena = new SurvivalArena(makeBuilds());
     const { log } = arena.run();
-    const t300 = log.find(l => l.tick === 300);
-    if (t300 && t300.activeZones.length <= 2) mergeAt300Count++;
+    totalTicks += log.length;
   }
-  assert(mergeAt300Count > 0, `존 합류 @300 발생: ${mergeAt300Count}/${runs} 게임`);
+  const avgTicks = totalTicks / runs;
+  assert(avgTicks > 50, `평균 ${avgTicks.toFixed(0)}틱 (최소 50틱 = 10초 이상)`);
+  assert(avgTicks < 1500, `평균 ${avgTicks.toFixed(0)}틱 (1500틱 내 종료)`);
 }
 
 // ─── Test 4: Monster Waves ───
@@ -118,8 +118,8 @@ console.log('\n[Test 6] 강화 레벨 범위');
   assert(avgMax >= 2 && avgMax <= 20, `평균 최대 강화: ${avgMax.toFixed(1)} (범위 2-20)`);
 }
 
-// ─── Test 7: Zone-Aware Targeting ───
-console.log('\n[Test 7] 존 인식 타겟팅');
+// ─── Test 7: Open PvP Targeting (no zone restriction) ───
+console.log('\n[Test 7] 오픈 PvP 타겟팅');
 {
   const { BehaviorTree } = require('./shared/BehaviorTree');
   const char = { id: 'p0', team: 0, zoneId: 0, alive: true, hp: 100, stats: { maxHP: 100, ATK: 10, DEF: 5, SPD: 5, INT: 0 }, btWeights: { survive: 20, skill: 30, attack: 50 }, skills: [], buffs: [], x: 100, y: 200, range: 60 };
@@ -128,10 +128,10 @@ console.log('\n[Test 7] 존 인식 타겟팅');
   const monster = { id: 'm0', team: -1, zoneId: 0, alive: true, hp: 50, x: 120 };
   const bt = new BehaviorTree(char, { characters: [char, enemy1, enemy2, monster] });
   const enemies = bt.getEnemies();
-  assert(enemies.length === 2, `같은 존 적 2명 (found ${enemies.length})`);
-  assert(enemies.some(e => e.id === 'p1'), 'p1 (같은 존) 타겟 가능');
-  assert(enemies.some(e => e.id === 'm0'), '몬스터 (같은 존) 타겟 가능');
-  assert(!enemies.some(e => e.id === 'p2'), 'p2 (다른 존) 타겟 불가');
+  assert(enemies.length === 3, `모든 적 3명 타겟 가능 (found ${enemies.length})`);
+  assert(enemies.some(e => e.id === 'p1'), 'p1 타겟 가능');
+  assert(enemies.some(e => e.id === 'p2'), 'p2 (다른 존) 타겟 가능 (오픈 PvP)');
+  assert(enemies.some(e => e.id === 'm0'), '몬스터 타겟 가능');
 }
 
 // ─── Test 8: PvP No Zone (backward compat) ───

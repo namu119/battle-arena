@@ -208,10 +208,9 @@ class BattleEngine {
     switch (skillData.type) {
       case 'attack': {
         if (skillData.aoe) {
-          // 범위 공격 (존 필터 포함)
+          // 범위 공격
           const nearby = this.characters.filter(
             c => c.team !== caster.team && c.alive && this.getDistance(caster, c) <= 150
-              && (caster.zoneId == null || c.zoneId == null || c.zoneId === caster.zoneId)
           );
           const dmg = (skillData.damage + caster.stats.INT * 2) * DAMAGE_SCALE;
           for (const t of nearby) {
