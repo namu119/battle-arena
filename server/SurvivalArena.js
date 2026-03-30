@@ -63,8 +63,8 @@ class SurvivalArena {
     this.tick++;
     this.metaEvents = [];
 
-    // 1. Spawn monster waves
-    const spawns = this.waveManager.getSpawns(this.tick, [...this.activeZones]);
+    // 1. Spawn monster waves (pass expanded bounds resolver)
+    const spawns = this.waveManager.getSpawns(this.tick, [...this.activeZones], (zoneId) => this._getExpandedBounds(zoneId));
     for (const monster of spawns) {
       this.engine.addCharacter(monster);
     }
@@ -140,14 +140,25 @@ class SurvivalArena {
   _checkZoneMerges() {
     for (const merge of ZONE_MERGES) {
       if (this.tick === merge.tick) {
-        for (const [from, to] of merge.merges) {
-          if (this.activeZones.has(from)) {
-            this._mergeZone(from, to);
-          }
+        // Phase 1: delete all merging zones first
+        for (const [from] of merge.merges) {
+          this.activeZones.delete(from);
         }
-        // Update phase
+
+        // Update phase after all deletes
         if (this.activeZones.size <= 2) this.phase = 2;
         if (this.activeZones.size <= 1) this.phase = 3;
+
+        // Phase 2: reassign zoneIds and reposition with correct expanded bounds
+        for (const [from, to] of merge.merges) {
+          const toBounds = this._getExpandedBounds(to);
+          for (const char of this.engine.characters) {
+            if (char.zoneId === from) {
+              char.zoneId = to;
+              char.x = toBounds.minX + Math.random() * (toBounds.maxX - toBounds.minX);
+            }
+          }
+        }
 
         this.metaEvents.push({
           type: 'zoneMerge',
@@ -155,20 +166,6 @@ class SurvivalArena {
           activeZones: [...this.activeZones],
           phase: this.phase,
         });
-      }
-    }
-  }
-
-  _mergeZone(fromZone, toZone) {
-    this.activeZones.delete(fromZone);
-    const toBounds = this._getExpandedBounds(toZone);
-
-    // Update all characters in the merging zone
-    for (const char of this.engine.characters) {
-      if (char.zoneId === fromZone) {
-        char.zoneId = toZone;
-        // Reposition within new zone bounds
-        char.x = toBounds.minX + Math.random() * (toBounds.maxX - toBounds.minX);
       }
     }
   }

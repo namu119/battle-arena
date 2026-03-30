@@ -40,13 +40,14 @@ class MonsterWaveManager {
   }
 
   /** Check if any waves should spawn this tick, return monster charData[] */
-  getSpawns(tick, activeZoneIds) {
+  getSpawns(tick, activeZoneIds, boundsResolver) {
     const spawns = [];
     for (const wave of this.scheduledWaves) {
       if (wave.tick === tick && !this.spawnedWaves.has(wave.wave)) {
         this.spawnedWaves.add(wave.wave);
         for (const zoneId of activeZoneIds) {
-          const monsters = this._createWaveMonsters(wave, zoneId);
+          const bounds = boundsResolver ? boundsResolver(zoneId) : this._getZoneBounds(zoneId);
+          const monsters = this._createWaveMonsters(wave, zoneId, bounds);
           spawns.push(...monsters);
         }
       }
@@ -54,9 +55,9 @@ class MonsterWaveManager {
     return spawns;
   }
 
-  _createWaveMonsters(wave, zoneId) {
+  _createWaveMonsters(wave, zoneId, bounds) {
     const monsters = [];
-    const bounds = this._getZoneBounds(zoneId);
+    if (!bounds) bounds = this._getZoneBounds(zoneId);
 
     for (const group of wave.monstersPerZone) {
       const pool = MONSTER_POOL[group.type];
