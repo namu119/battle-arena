@@ -2,6 +2,14 @@ const dropsData = require('../data/drops.json');
 
 const SLOTS = ['helmet', 'armor', 'weapon', 'boots'];
 
+// 슬롯별 스탯 친화도: 해당 스탯이 나올 확률 70%, 나머지 30%
+const SLOT_STAT_AFFINITY = {
+  helmet: 'DEF',
+  armor: 'DEF',
+  weapon: 'ATK',
+  boots: 'SPD',
+};
+
 class DropSystem {
   constructor() {
     this.dropLog = []; // track drops for events
@@ -33,10 +41,11 @@ class DropSystem {
     // Enhance equipment
     killerChar.enhancementLevels[slot] = currentLevel + 1;
 
-    // Distribute stat bonus to random stats
+    // Distribute stat bonus with slot affinity (70% primary, 30% random)
+    const primaryStat = SLOT_STAT_AFFINITY[slot] || 'ATK';
     const statKeys = ['ATK', 'DEF', 'INT', 'SPD'];
     for (let i = 0; i < statBonus; i++) {
-      const key = statKeys[Math.floor(Math.random() * statKeys.length)];
+      const key = Math.random() < 0.7 ? primaryStat : statKeys[Math.floor(Math.random() * statKeys.length)];
       killerChar.equipmentBonuses[key] = (killerChar.equipmentBonuses[key] || 0) + 1;
     }
 
@@ -94,6 +103,55 @@ class DropSystem {
     };
     this.dropLog.push(drop);
     return drop;
+  }
+
+  /** Process a player kill: killer gets gold + steal some stats */
+  processPlayerKill(deadPlayer, killerChar) {
+    if (!killerChar || killerChar.isMonster || !deadPlayer) return null;
+    if (deadPlayer.isMonster) return null;
+
+    // Gold reward: 100 base + 50% of dead player's gold
+    const goldReward = 100 + Math.floor((deadPlayer.gold || 0) * 0.5);
+    killerChar.gold = (killerChar.gold || 0) + goldReward;
+
+    // Steal 1 enhancement level from dead player's highest slot
+    let stolenSlot = null;
+    let maxLevel = 0;
+    for (const slot of SLOTS) {
+      const lvl = deadPlayer.enhancementLevels?.[slot] || 0;
+      if (lvl > maxLevel) { maxLevel = lvl; stolenSlot = slot; }
+    }
+
+    let stolenBonus = 0;
+    if (stolenSlot && maxLevel > 0) {
+      // Transfer 1 enhancement level
+      const primaryStat = SLOT_STAT_AFFINITY[stolenSlot] || 'ATK';
+      killerChar.equipmentBonuses[primaryStat] = (killerChar.equipmentBonuses[primaryStat] || 0) + 2;
+      killerChar.enhancementLevels[stolenSlot] = Math.min(
+        dropsData.enhancement.maxLevel,
+        (killerChar.enhancementLevels[stolenSlot] || 0) + 1
+      );
+      DropSystem.recalcStats(killerChar);
+      stolenBonus = 2;
+    }
+
+    const drop = {
+      type: 'playerKill',
+      gold: goldReward,
+      stolenSlot,
+      stolenBonus,
+      playerId: killerChar.id,
+      victimName: deadPlayer.name,
+    };
+    this.dropLog.push(drop);
+    return drop;
+  }
+
+  /** Auto-enhance cooldown tracking (ticks since last auto-enhance) */
+  canAutoEnhance(player) {
+    const cooldown = 50; // 50 ticks = 10 seconds between auto-enhances
+    const lastTick = player._lastAutoEnhanceTick || 0;
+    return (player._currentTick || 0) - lastTick >= cooldown;
   }
 
   /** Flush and return pending drop events */

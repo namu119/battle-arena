@@ -75,15 +75,19 @@ class SurvivalArena {
     // 2. Advance battle engine
     this.engine.processTick();
 
-    // 3. Process drops from monster deaths
-    const dropEvents = this._processDrops();
+    // 3. Process drops from monster deaths + player kills
+    this._processDrops();
 
-    // 4. Gold auto-enhance check
+    // 4. Gold auto-enhance check (with cooldown: 50 ticks = 10s)
     for (const char of this.engine.characters) {
       if (char.alive && !char.isMonster) {
-        const goldDrop = this.dropSystem.processGoldAutoEnhance(char);
-        if (goldDrop) {
-          this.metaEvents.push({ type: 'drop', ...goldDrop });
+        char._currentTick = this.tick;
+        if (this.dropSystem.canAutoEnhance(char)) {
+          const goldDrop = this.dropSystem.processGoldAutoEnhance(char);
+          if (goldDrop) {
+            char._lastAutoEnhanceTick = this.tick;
+            this.metaEvents.push({ type: 'drop', dropType: goldDrop.type, slot: goldDrop.slot, level: goldDrop.level, statBonus: goldDrop.statBonus, gold: goldDrop.gold, playerId: goldDrop.playerId });
+          }
         }
       }
     }
@@ -127,10 +131,19 @@ class SurvivalArena {
       if (evt.type === 'death' && evt.killedBy) {
         const deadChar = this.engine.characters.find(c => c.id === evt.target);
         const killer = this.engine.characters.find(c => c.id === evt.killedBy);
-        if (deadChar && deadChar.isMonster && killer) {
-          const drop = this.dropSystem.processMonsterDeath(deadChar, killer);
-          if (drop) {
-            this.metaEvents.push({ type: 'drop', dropType: drop.type, slot: drop.slot, level: drop.level, statBonus: drop.statBonus, gold: drop.gold, playerId: drop.playerId });
+        if (deadChar && killer) {
+          if (deadChar.isMonster) {
+            // Monster kill → equipment drop
+            const drop = this.dropSystem.processMonsterDeath(deadChar, killer);
+            if (drop) {
+              this.metaEvents.push({ type: 'drop', dropType: drop.type, slot: drop.slot, level: drop.level, statBonus: drop.statBonus, gold: drop.gold, playerId: drop.playerId });
+            }
+          } else if (!deadChar.isMonster && !killer.isMonster) {
+            // Player kill → gold + steal
+            const drop = this.dropSystem.processPlayerKill(deadChar, killer);
+            if (drop) {
+              this.metaEvents.push({ type: 'drop', dropType: 'playerKill', gold: drop.gold, stolenSlot: drop.stolenSlot, playerId: drop.playerId, victimName: drop.victimName });
+            }
           }
         }
       }

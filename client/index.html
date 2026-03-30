@@ -1761,6 +1761,8 @@
             survivalNotify(`+${evt.gold}G (${slotNames[evt.slot]} MAX)`, '#f0a500');
           } else if (evt.dropType === 'goldEnhance') {
             survivalNotify(`골드 강화: ${slotNames[evt.slot]} +${evt.level}`, '#7ec8e3');
+          } else if (evt.dropType === 'playerKill') {
+            survivalNotify(`⚔ ${evt.victimName} 처치! +${evt.gold}G${evt.stolenSlot ? ' +' + (slotNames[evt.stolenSlot]||evt.stolenSlot) + ' 탈취' : ''}`, '#ff4444');
           }
         }
         if (evt.type === 'waveSpawn') {
