@@ -389,7 +389,10 @@
 
   <!-- 전투 화면 -->
   <div id="battle-screen">
-    <h2 style="margin:10px">전투 진행중</h2>
+    <div style="display:flex;align-items:center;gap:10px;margin:10px">
+      <h2 style="margin:0">전투 진행중</h2>
+      <button class="btn btn-secondary" id="speedBtn" style="padding:6px 12px;font-size:13px;min-height:32px">1x</button>
+    </div>
     <div class="hp-bars" id="hpBars"></div>
     <canvas id="battle-canvas"></canvas>
     <div id="tickInfo" style="margin:10px;color:#aaa"></div>
@@ -402,6 +405,7 @@
       <div style="color:#f0a500" id="survivalPhase">Phase 1 - PvE</div>
       <div style="color:#f0a500" id="survivalGold">💰 0G</div>
       <div style="color:#7ec8e3;font-size:0.9em" id="survivalEnhance">🔨 0/0/0/0</div>
+      <button class="btn btn-secondary" id="survivalSpeedBtn" style="padding:6px 12px;font-size:13px;min-height:32px">1x</button>
     </div>
     <div id="survivalNotify" style="position:fixed;top:60px;right:20px;z-index:100"></div>
     <canvas id="survival-canvas"></canvas>
@@ -787,6 +791,20 @@
     }
 
     // ─── 전투 화면 ───
+    // ─── 배속 컨트롤 ───
+    let playbackSpeed = 1;
+    const SPEED_OPTIONS = [1, 2, 4];
+    const speedBtn = document.getElementById('speedBtn');
+    if (speedBtn) {
+      speedBtn.addEventListener('click', () => {
+        const idx = (SPEED_OPTIONS.indexOf(playbackSpeed) + 1) % SPEED_OPTIONS.length;
+        playbackSpeed = SPEED_OPTIONS[idx];
+        speedBtn.textContent = playbackSpeed + 'x';
+        // Notify server to change tick rate
+        socket.emit('setSpeed', playbackSpeed);
+      });
+    }
+
     const canvas = document.getElementById('battle-canvas');
     const ctx = canvas.getContext('2d');
     const classColors = { '전사':'#e94560', '마법사':'#7b2ff7', '도적':'#2ecc71', '기사':'#3498db', '궁수':'#f39c12' };
@@ -962,6 +980,19 @@
 
       ctx.restore();
 
+      // HP bar above character
+      if (char.alive && (deathProgress === undefined)) {
+        const hpRatio = Math.max(0, (char.hp || 0) / (char.maxHP || char.stats?.maxHP || 1));
+        const barW = baseSize * 2;
+        const barH = Math.max(2, baseSize * 0.15);
+        const barY = qvY - baseSize * 3.2;
+        ctx.fillStyle = '#333';
+        ctx.fillRect(qvX - barW/2, barY, barW, barH);
+        const hpColor = hpRatio > 0.5 ? '#2ecc71' : hpRatio > 0.25 ? '#f39c12' : '#e94560';
+        ctx.fillStyle = hpColor;
+        ctx.fillRect(qvX - barW/2, barY, barW * hpRatio, barH);
+      }
+
       // Name label below shadow (not affected by death transform)
       if (deathProgress === undefined || deathProgress < 0.8) {
         const isMobile = canvas.width < 400;
@@ -1083,15 +1114,16 @@
     }
 
     // ─── Task 5: Animation system ───
-    function spawnDamageNumber(x, y, amount, isSkill) {
+    function spawnDamageNumber(x, y, amount, isSkill, isCrit) {
       animations.push({
         type: 'damage',
         x, y,
         startY: y,
-        amount,
+        amount: isCrit ? amount + ' CRIT!' : amount,
         isSkill,
+        isCrit: !!isCrit,
         born: performance.now(),
-        duration: 1000,
+        duration: isCrit ? 1200 : 1000,
       });
     }
 
@@ -1169,10 +1201,13 @@
       switch (effect.type) {
         case 'damage': {
           const isMobile = canvas.width < 400;
-          const fontSize = effect.isSkill
-            ? Math.max(12, Math.round(isMobile ? 14 : 18))
-            : Math.max(10, Math.round(isMobile ? 12 : 15));
-          ctx.font = `bold ${fontSize}px sans-serif`;
+          const baseFontSize = effect.isCrit
+            ? Math.max(14, Math.round(isMobile ? 18 : 22))
+            : effect.isSkill
+              ? Math.max(12, Math.round(isMobile ? 14 : 18))
+              : Math.max(10, Math.round(isMobile ? 12 : 15));
+          const fontSize = effect.isCrit ? baseFontSize * (1 + (1-t)*0.3) : baseFontSize;
+          ctx.font = `bold ${Math.round(fontSize)}px sans-serif`;
           ctx.textAlign = 'center';
           const dy = -40 * t;
           const x = effect.x;
@@ -1181,7 +1216,7 @@
           ctx.strokeStyle = '#000';
           ctx.lineWidth = 3;
           ctx.strokeText(effect.amount, x, y);
-          ctx.fillStyle = effect.isSkill ? '#ffd700' : '#fff';
+          ctx.fillStyle = effect.isCrit ? '#ff6600' : effect.isSkill ? '#ffd700' : '#fff';
           ctx.fillText(effect.amount, x, y);
           break;
         }
@@ -1343,7 +1378,7 @@
             // Snapshot position at spawn time
             const pos = getCharQV(evt.to);
             if (pos) {
-              spawnDamageNumber(pos.qvX, pos.qvY - 20, evt.amount, !!evt.skill);
+              spawnDamageNumber(pos.qvX, pos.qvY - 20, evt.amount, !!evt.skill, !!evt.crit);
             }
             break;
           }
@@ -1450,6 +1485,17 @@
       survivalCanvas.width = w;
       survivalCanvas.height = Math.round(w * 0.5);
     }
+    const survivalSpeedBtn = document.getElementById('survivalSpeedBtn');
+    if (survivalSpeedBtn) {
+      survivalSpeedBtn.addEventListener('click', () => {
+        const idx = (SPEED_OPTIONS.indexOf(playbackSpeed) + 1) % SPEED_OPTIONS.length;
+        playbackSpeed = SPEED_OPTIONS[idx];
+        survivalSpeedBtn.textContent = playbackSpeed + 'x';
+        if (speedBtn) speedBtn.textContent = playbackSpeed + 'x';
+        socket.emit('setSpeed', playbackSpeed);
+      });
+    }
+
     if (survivalCanvas) {
       resizeSurvivalCanvas();
       window.addEventListener('resize', () => {
@@ -1592,6 +1638,18 @@
       ctx.fill();
 
       ctx.restore();
+
+      // HP bar above monster
+      if (char.alive && deathProgress === undefined) {
+        const hpRatio = Math.max(0, (char.hp || 0) / (char.maxHP || 1));
+        const barW = size * 2;
+        const barH = Math.max(2, size * 0.2);
+        const barY = qvY - size * 2.2;
+        ctx.fillStyle = '#333';
+        ctx.fillRect(qvX - barW/2, barY, barW, barH);
+        ctx.fillStyle = hpRatio > 0.5 ? '#2ecc71' : hpRatio > 0.25 ? '#f39c12' : '#e94560';
+        ctx.fillRect(qvX - barW/2, barY, barW * hpRatio, barH);
+      }
 
       // Level label
       if (deathProgress === undefined || deathProgress < 0.5) {

@@ -113,6 +113,29 @@ function createRoom(id) {
 io.on('connection', (socket) => {
   console.log(`접속: ${socket.id}`);
   let currentRoom = null;
+  let activeInterval = null; // battle/survival interval cleanup on disconnect
+  let currentTickLog = null; // for speed control
+  let currentTickIndex = 0;
+  let currentTickMode = null; // 'battle' or 'survival'
+  let currentTickResults = null;
+
+  // 배속 컨트롤
+  socket.on('setSpeed', (speed) => {
+    const validSpeeds = [1, 2, 4];
+    if (!validSpeeds.includes(speed) || !activeInterval || !currentTickLog) return;
+    clearInterval(activeInterval);
+    activeInterval = setInterval(() => {
+      if (currentTickIndex >= currentTickLog.length) {
+        clearInterval(activeInterval);
+        activeInterval = null;
+        const endEvent = currentTickMode === 'survival' ? 'survivalEnd' : 'battleEnd';
+        socket.emit(endEvent, { results: currentTickResults });
+        return;
+      }
+      socket.emit(currentTickMode === 'survival' ? 'survivalTick' : 'battleTick', currentTickLog[currentTickIndex]);
+      currentTickIndex++;
+    }, TICK_INTERVAL / speed);
+  });
 
   // 방 목록
   socket.on('getRooms', () => {
@@ -186,17 +209,22 @@ io.on('connection', (socket) => {
       const { log, results } = engine.run();
       const rewarded = calculateRewards(results);
 
+      currentTickLog = log;
+      currentTickIndex = 0;
+      currentTickMode = 'battle';
+      currentTickResults = rewarded;
+
       socket.emit('battleStart', { totalTicks: log.length });
 
-      let tickIndex = 0;
-      const interval = setInterval(() => {
-        if (tickIndex >= log.length) {
-          clearInterval(interval);
-          socket.emit('battleEnd', { results: rewarded });
+      activeInterval = setInterval(() => {
+        if (currentTickIndex >= currentTickLog.length) {
+          clearInterval(activeInterval);
+          activeInterval = null;
+          socket.emit('battleEnd', { results: currentTickResults });
           return;
         }
-        socket.emit('battleTick', log[tickIndex]);
-        tickIndex++;
+        socket.emit('battleTick', currentTickLog[currentTickIndex]);
+        currentTickIndex++;
       }, TICK_INTERVAL);
     } catch (e) {
       console.error('AI전투 에러:', e);
@@ -219,21 +247,26 @@ io.on('connection', (socket) => {
       const arena = new SurvivalArena(allBuilds);
       const { log, results } = arena.run();
 
+      currentTickLog = log;
+      currentTickIndex = 0;
+      currentTickMode = 'survival';
+      currentTickResults = results;
+
       socket.emit('survivalStart', {
         totalTicks: log.length,
         zones: [0, 1, 2, 3],
         playerZone: 0,
       });
 
-      let tickIndex = 0;
-      const interval = setInterval(() => {
-        if (tickIndex >= log.length) {
-          clearInterval(interval);
-          socket.emit('survivalEnd', { results });
+      activeInterval = setInterval(() => {
+        if (currentTickIndex >= currentTickLog.length) {
+          clearInterval(activeInterval);
+          activeInterval = null;
+          socket.emit('survivalEnd', { results: currentTickResults });
           return;
         }
-        socket.emit('survivalTick', log[tickIndex]);
-        tickIndex++;
+        socket.emit('survivalTick', currentTickLog[currentTickIndex]);
+        currentTickIndex++;
       }, TICK_INTERVAL);
     } catch (e) {
       console.error('서바이벌 에러:', e);
@@ -243,6 +276,11 @@ io.on('connection', (socket) => {
 
   // 연결 해제
   socket.on('disconnect', () => {
+    // 진행 중인 전투/서바이벌 interval 정리
+    if (activeInterval) {
+      clearInterval(activeInterval);
+      activeInterval = null;
+    }
     if (currentRoom) {
       currentRoom.players.delete(socket.id);
       if (currentRoom.players.size === 0) {

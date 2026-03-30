@@ -164,9 +164,11 @@ class BattleEngine {
     }
 
     // 패시브: 급소공격 (도적)
+    let isCrit = false;
     if (attacker.passive?.trigger === 'on_attack' && attacker.passive.effect.critMul) {
       if (Math.random() < attacker.passive.chance) {
         damage *= attacker.passive.effect.critMul;
+        isCrit = true;
       }
     }
 
@@ -184,7 +186,7 @@ class BattleEngine {
     }
 
     damage = Math.round(damage);
-    this.applyDamage(target, damage, attacker.id, null, this.tickEvents);
+    this.applyDamage(target, damage, attacker.id, null, this.tickEvents, isCrit);
   }
 
   /** 스킬 사용 */
@@ -205,6 +207,10 @@ class BattleEngine {
       }
     }
 
+    // 버프 효과: 마력증폭 등 스킬 데미지 배율
+    const hasDamageBuff = caster.buffs.some(b => b.type === 'buff');
+    const buffMultiplier = hasDamageBuff ? 1.5 : 1.0;
+
     switch (skillData.type) {
       case 'attack': {
         if (skillData.aoe) {
@@ -212,7 +218,7 @@ class BattleEngine {
           const nearby = this.characters.filter(
             c => c.team !== caster.team && c.alive && this.getDistance(caster, c) <= 150
           );
-          const dmg = (skillData.damage + caster.stats.INT * 2) * DAMAGE_SCALE;
+          const dmg = (skillData.damage + caster.stats.INT * 2) * DAMAGE_SCALE * buffMultiplier;
           for (const t of nearby) {
             this.applyDamage(t, Math.round(dmg), caster.id, skillData.name, this.tickEvents);
           }
@@ -221,7 +227,7 @@ class BattleEngine {
           const target = this.characters.find(c => c.id === targetId);
           if (target && target.alive) {
             const hits = skillData.hits || 1;
-            const dmgPerHit = Math.round((skillData.damage + caster.stats.ATK) * DAMAGE_SCALE / hits);
+            const dmgPerHit = Math.round((skillData.damage + caster.stats.ATK) * DAMAGE_SCALE * buffMultiplier / hits);
             for (let i = 0; i < hits; i++) {
               if (target.alive) this.applyDamage(target, dmgPerHit, caster.id, skillData.name, this.tickEvents);
             }
@@ -291,7 +297,7 @@ class BattleEngine {
   }
 
   /** 데미지 적용 */
-  applyDamage(target, damage, attackerId, skillName, tickEvents) {
+  applyDamage(target, damage, attackerId, skillName, tickEvents, isCrit) {
     // 쉴드 먼저 소모
     const shield = target.buffs.find(b => b.type === 'shield');
     if (shield) {
@@ -306,7 +312,7 @@ class BattleEngine {
 
     const actualDamageDealt = Math.min(damage, target.hp);
     target.hp = Math.max(0, target.hp - damage);
-    if (tickEvents) tickEvents.push({ type: 'damage', from: attackerId, to: target.id, amount: actualDamageDealt, skill: skillName || null });
+    if (tickEvents) tickEvents.push({ type: 'damage', from: attackerId, to: target.id, amount: actualDamageDealt, skill: skillName || null, crit: !!isCrit });
     if (target.hp <= 0 && target.alive) {
       target.alive = false;
       target.deathTick = this.tick;

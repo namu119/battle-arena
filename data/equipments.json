@@ -20,7 +20,7 @@
     "가죽갑옷": {
       "slot": "armor", "cost": 150,
       "stats": { "DEF": 4, "SPD": 1 },
-      "skill": { "name": "긴급회피", "type": "defense", "damage": 0, "cooldown": 6, "description": "다음 공격 1회 회피" }
+      "skill": { "name": "긴급회피", "type": "defense", "damage": 0, "shield": 25, "cooldown": 6, "description": "보호막 생성" }
     },
     "철갑옷": {
       "slot": "armor", "cost": 200,
