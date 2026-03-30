@@ -1,0 +1,14 @@
+{
+  "name": "battle-arena",
+  "version": "1.0.0",
+  "description": "장비-스킬 BT 기반 오토배틀 게임",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node test-battle.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.4"
+  }
+}

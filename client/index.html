@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Battle Arena</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #1a1a2e;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', sans-serif;
+      overflow: hidden;
+    }
+
+    /* 로비 */
+    #lobby, #workshop, #battle-screen, #result-screen {
+      display: none;
+      width: 100vw; height: 100vh;
+      flex-direction: column; align-items: center; justify-content: center;
+    }
+    .active { display: flex !important; }
+
+    h1 { color: #e94560; margin-bottom: 20px; font-size: 2em; }
+    h2 { color: #e94560; margin-bottom: 15px; }
+
+    .btn {
+      background: #e94560;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 5px;
+      transition: background 0.2s;
+    }
+    .btn:hover { background: #c73e54; }
+    .btn:disabled { background: #555; cursor: not-allowed; }
+    .btn-secondary { background: #16213e; border: 1px solid #e94560; }
+
+    input {
+      background: #16213e;
+      border: 1px solid #444;
+      color: white;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 16px;
+      margin: 5px;
+    }
+
+    /* 상점 */
+    #workshop {
+      overflow-y: auto;
+      padding: 20px;
+    }
+    .shop-section {
+      background: #16213e;
+      border-radius: 12px;
+      padding: 15px;
+      margin: 8px;
+      width: 90%;
+      max-width: 800px;
+    }
+    .shop-section h3 {
+      color: #e94560;
+      margin-bottom: 10px;
+      font-size: 1.1em;
+    }
+    .item-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .item-card {
+      background: #0f3460;
+      border: 2px solid transparent;
+      border-radius: 8px;
+      padding: 10px;
+      cursor: pointer;
+      flex: 1;
+      min-width: 140px;
+      transition: border-color 0.2s;
+    }
+    .item-card:hover { border-color: #e94560; }
+    .item-card.selected { border-color: #e94560; background: #1a1a4e; }
+    .item-name { font-weight: bold; color: #fff; }
+    .item-cost { color: #f0a500; font-size: 0.9em; }
+    .item-stats { color: #aaa; font-size: 0.85em; margin-top: 4px; }
+    .item-skill { color: #7ec8e3; font-size: 0.85em; margin-top: 4px; }
+
+    .stat-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 5px 0;
+    }
+    .stat-row label { width: 50px; font-weight: bold; }
+    .stat-row input[type=range] { flex: 1; }
+    .stat-row span { width: 30px; text-align: center; }
+
+    .gold-display {
+      color: #f0a500;
+      font-size: 1.3em;
+      font-weight: bold;
+      margin: 10px;
+    }
+    .points-display {
+      color: #7ec8e3;
+      font-size: 1.1em;
+      margin: 5px;
+    }
+
+    .skill-select {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .skill-chip {
+      background: #0f3460;
+      border: 2px solid transparent;
+      border-radius: 20px;
+      padding: 6px 14px;
+      cursor: pointer;
+      font-size: 0.9em;
+    }
+    .skill-chip:hover { border-color: #7ec8e3; }
+    .skill-chip.selected { border-color: #7ec8e3; background: #1a1a4e; }
+    .skill-chip.disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* 전투 화면 */
+    #battle-screen { padding: 0; }
+    #battle-canvas {
+      background: #0f3460;
+      border: 2px solid #e94560;
+      border-radius: 8px;
+    }
+    .hp-bars {
+      display: flex;
+      gap: 15px;
+      margin: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .hp-bar-container {
+      text-align: center;
+      min-width: 120px;
+    }
+    .hp-bar-bg {
+      background: #333;
+      border-radius: 4px;
+      height: 14px;
+      width: 120px;
+      overflow: hidden;
+    }
+    .hp-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.15s;
+    }
+    .hp-text { font-size: 0.8em; color: #aaa; }
+    .char-name { font-size: 0.9em; font-weight: bold; }
+
+    /* 결과 */
+    .result-card {
+      background: #16213e;
+      border-radius: 12px;
+      padding: 15px 30px;
+      margin: 8px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      min-width: 300px;
+    }
+    .rank { font-size: 2em; font-weight: bold; }
+    .rank-1 { color: #f0a500; }
+    .rank-2 { color: #c0c0c0; }
+    .rank-3 { color: #cd7f32; }
+    .reward-gold { color: #f0a500; font-weight: bold; }
+
+    .player-list {
+      background: #16213e;
+      border-radius: 8px;
+      padding: 10px 20px;
+      margin: 10px;
+      min-width: 200px;
+    }
+    .player-entry { padding: 5px 0; }
+    .player-ready { color: #4caf50; }
+    .player-waiting { color: #f0a500; }
+
+    #loading-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: #1a1a2e; display: flex; align-items: center; justify-content: center;
+      z-index: 999; font-size: 1.5em; color: #e94560;
+    }
+    #loading-overlay.hidden { display: none; }
+  </style>
+</head>
+<body>
+
+  <!-- 로딩 오버레이 -->
+  <div id="loading-overlay">데이터 로딩중...</div>
+
+  <!-- 로비 -->
+  <div id="lobby">
+    <h1>Battle Arena</h1>
+    <input id="playerName" placeholder="닉네임" maxlength="10" value="">
+    <div style="margin: 15px">
+      <button class="btn" onclick="createRoom()">방 만들기</button>
+      <button class="btn btn-secondary" onclick="refreshRooms()">방 목록</button>
+      <button class="btn" onclick="soloMode()" style="background:#0f3460;border:1px solid #7ec8e3">혼자 연습 (vs AI)</button>
+    </div>
+    <div id="roomList"></div>
+  </div>
+
+  <!-- 캐릭터 제작소 -->
+  <div id="workshop">
+    <h2>캐릭터 제작</h2>
+    <div class="gold-display">💰 <span id="goldDisplay">1000</span>G</div>
+    <div class="points-display">스탯 포인트: <span id="pointsDisplay">10</span></div>
+
+    <!-- 병과 선택 -->
+    <div class="shop-section">
+      <h3>병과 선택</h3>
+      <div class="item-grid" id="classGrid"></div>
+    </div>
+
+    <!-- 스탯 배분 -->
+    <div class="shop-section">
+      <h3>스탯 배분 (10포인트)</h3>
+      <div id="statSliders"></div>
+    </div>
+
+    <!-- 장비 상점 -->
+    <div class="shop-section">
+      <h3>투구</h3>
+      <div class="item-grid" id="helmetGrid"></div>
+    </div>
+    <div class="shop-section">
+      <h3>갑옷</h3>
+      <div class="item-grid" id="armorGrid"></div>
+    </div>
+    <div class="shop-section">
+      <h3>무기</h3>
+      <div class="item-grid" id="weaponGrid"></div>
+    </div>
+    <div class="shop-section">
+      <h3>신발</h3>
+      <div class="item-grid" id="bootsGrid"></div>
+    </div>
+
+    <!-- 스킬 선택 -->
+    <div class="shop-section">
+      <h3>스킬 선택 (4개 중 3개)</h3>
+      <div class="skill-select" id="skillSelect"></div>
+    </div>
+
+    <div style="margin: 15px; display: flex; gap: 10px; align-items: center">
+      <button class="btn" id="submitBtn" onclick="submitBuild()" disabled style="display:none">출전!</button>
+      <button class="btn" id="aiBtn" onclick="fightAI()" disabled style="background:#0f3460;border:1px solid #7ec8e3;display:none">AI와 전투</button>
+      <div class="player-list" id="playerList"></div>
+    </div>
+  </div>
+
+  <!-- 전투 화면 -->
+  <div id="battle-screen">
+    <h2 style="margin:10px">전투 진행중</h2>
+    <div class="hp-bars" id="hpBars"></div>
+    <canvas id="battle-canvas" width="800" height="300"></canvas>
+    <div id="tickInfo" style="margin:10px;color:#aaa"></div>
+  </div>
+
+  <!-- 결과 화면 -->
+  <div id="result-screen">
+    <h2>전투 결과</h2>
+    <div id="resultCards"></div>
+    <button class="btn" onclick="backToWorkshop()" style="margin-top:20px">다시 출전</button>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    let myName = '';
+
+    // ─── 서버에서 데이터 로드 (await 보장) ───
+    let classData = {};
+    let equipData = {};
+    let dataLoaded = false;
+
+    async function loadGameData() {
+      try {
+        const res = await fetch('/api/data');
+        const data = await res.json();
+        classData = data.classes;
+        equipData = data.equipments;
+        dataLoaded = true;
+        console.log('게임 데이터 로드 완료', Object.keys(classData), Object.keys(equipData));
+        // 로딩 완료 → 로비 표시
+        document.getElementById('loading-overlay').classList.add('hidden');
+        document.getElementById('lobby').classList.add('active');
+      } catch (e) {
+        console.error('데이터 로드 실패', e);
+        document.getElementById('loading-overlay').textContent = '데이터 로드 실패. 새로고침 해주세요.';
+      }
+    }
+    loadGameData();
+
+    // ─── 빌드 상태 ───
+    let selectedClass = null;
+    let stats = { ATK:0, DEF:0, INT:0, SPD:0 };
+    let equip = { helmet:null, armor:null, weapon:null, boots:null };
+    let selectedSkills = [];
+    const INITIAL_GOLD = 1000;
+    const STAT_POINTS = 10;
+    let soloPlay = false;
+
+    // ─── 화면 전환 ───
+    function showScreen(id) {
+      document.querySelectorAll('#lobby,#workshop,#battle-screen,#result-screen').forEach(el => el.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
+    // ─── 로비 ───
+    function createRoom() {
+      if (!dataLoaded) return;
+      myName = document.getElementById('playerName').value.trim() || `전사${Math.floor(Math.random()*999)}`;
+      socket.emit('createRoom', myName);
+    }
+    function refreshRooms() {
+      socket.emit('getRooms');
+    }
+    function joinRoom(roomId) {
+      if (!dataLoaded) return;
+      myName = document.getElementById('playerName').value.trim() || `전사${Math.floor(Math.random()*999)}`;
+      socket.emit('joinRoom', { roomId, playerName: myName });
+    }
+
+    socket.on('roomList', (list) => {
+      const el = document.getElementById('roomList');
+      if (list.length === 0) { el.innerHTML = '<p style="color:#aaa">열린 방 없음</p>'; return; }
+      el.innerHTML = list.map(r =>
+        `<div style="margin:5px"><button class="btn btn-secondary" onclick="joinRoom('${r.id}')">${r.id.slice(-6)} (${r.players}/${r.max})</button></div>`
+      ).join('');
+    });
+
+    function soloMode() {
+      if (!dataLoaded) return;
+      myName = document.getElementById('playerName').value.trim() || `전사${Math.floor(Math.random()*999)}`;
+      soloPlay = true;
+      showScreen('workshop');
+      initWorkshop();
+      // 솔로: AI버튼만 표시
+      document.getElementById('submitBtn').style.display = 'none';
+      document.getElementById('aiBtn').style.display = '';
+      document.getElementById('playerList').innerHTML = '<b>솔로 모드</b><div class="player-entry player-ready">vs AI 3명</div>';
+    }
+
+    socket.on('joinedRoom', ({ roomId, players }) => {
+      soloPlay = false;
+      showScreen('workshop');
+      initWorkshop();
+      // 멀티: 출전버튼만 표시
+      document.getElementById('submitBtn').style.display = '';
+      document.getElementById('aiBtn').style.display = 'none';
+      updatePlayerList(players);
+    });
+
+    socket.on('playerJoined', ({ players }) => updatePlayerList(players));
+    socket.on('playerLeft', ({ players }) => updatePlayerList(players));
+    socket.on('playerReady', ({ players }) => updatePlayerList(players));
+
+    function updatePlayerList(players) {
+      const el = document.getElementById('playerList');
+      el.innerHTML = '<b>참가자</b>' + players.map(p =>
+        `<div class="player-entry ${p.ready ? 'player-ready' : 'player-waiting'}">${p.name} ${p.ready ? '✔' : '⏳'}</div>`
+      ).join('');
+    }
+
+    // ─── 제작소 ───
+    function initWorkshop() {
+      selectedClass = null;
+      stats = { ATK:0, DEF:0, INT:0, SPD:0 };
+      equip = { helmet:null, armor:null, weapon:null, boots:null };
+      selectedSkills = [];
+
+      renderClasses();
+      renderStats();
+      renderEquipments();
+      renderSkills();
+      updateGold();
+      validate();
+    }
+
+    function renderClasses() {
+      const grid = document.getElementById('classGrid');
+      grid.innerHTML = Object.entries(classData).map(([name, cls]) =>
+        `<div class="item-card" id="class-${name}" onclick="selectClass('${name}')">
+          <div class="item-name">${name}</div>
+          <div class="item-stats">HP:${cls.baseHP} ATK:${cls.baseATK} DEF:${cls.baseDEF} SPD:${cls.baseSPD}</div>
+          <div class="item-skill">패시브: ${cls.passive.name}</div>
+          <div class="item-stats">${cls.passive.description}</div>
+        </div>`
+      ).join('');
+    }
+
+    function selectClass(name) {
+      selectedClass = name;
+      document.querySelectorAll('#classGrid .item-card').forEach(el => el.classList.remove('selected'));
+      document.getElementById(`class-${name}`).classList.add('selected');
+      validate();
+    }
+
+    function renderStats() {
+      const container = document.getElementById('statSliders');
+      const statNames = { ATK: '공격', DEF: '방어', INT: '지능', SPD: '속도' };
+      container.innerHTML = Object.entries(statNames).map(([key, label]) =>
+        `<div class="stat-row">
+          <label>${label}</label>
+          <input type="range" min="0" max="10" value="0" id="stat-${key}" oninput="updateStat('${key}', this.value)">
+          <span id="stat-val-${key}">0</span>
+        </div>`
+      ).join('');
+    }
+
+    function updateStat(key, val) {
+      val = parseInt(val);
+      const others = Object.entries(stats).filter(([k]) => k !== key).reduce((a, [, v]) => a + v, 0);
+      if (others + val > STAT_POINTS) {
+        val = STAT_POINTS - others;
+        document.getElementById(`stat-${key}`).value = val;
+      }
+      stats[key] = val;
+      document.getElementById(`stat-val-${key}`).textContent = val;
+      document.getElementById('pointsDisplay').textContent = STAT_POINTS - Object.values(stats).reduce((a, b) => a + b, 0);
+      validate();
+    }
+
+    function renderEquipments() {
+      const slotMap = { helmet:'helmetGrid', armor:'armorGrid', weapon:'weaponGrid', boots:'bootsGrid' };
+      for (const [slot, gridId] of Object.entries(slotMap)) {
+        const category = slot === 'helmet' ? 'helmets' : slot === 'armor' ? 'armors' : slot === 'weapon' ? 'weapons' : 'boots';
+        const grid = document.getElementById(gridId);
+        const items = equipData[category];
+        if (!items) { grid.innerHTML = '<span style="color:#666">로딩중...</span>'; continue; }
+        grid.innerHTML = Object.entries(items).map(([name, item]) => {
+          const statsStr = Object.entries(item.stats).map(([k, v]) => `${k}+${v}`).join(' ');
+          return `<div class="item-card" id="equip-${name}" onclick="selectEquip('${slot}','${name}')">
+            <div class="item-name">${name}</div>
+            <div class="item-cost">${item.cost}G</div>
+            <div class="item-stats">${statsStr}</div>
+            <div class="item-skill">스킬: ${item.skill.name}</div>
+          </div>`;
+        }).join('');
+      }
+    }
+
+    function selectEquip(slot, name) {
+      const gridId = slot === 'helmet' ? 'helmetGrid' : slot === 'armor' ? 'armorGrid' : slot === 'weapon' ? 'weaponGrid' : 'bootsGrid';
+      document.querySelectorAll(`#${gridId} .item-card`).forEach(el => el.classList.remove('selected'));
+      document.getElementById(`equip-${name}`).classList.add('selected');
+
+      equip[slot] = name;
+      updateGold();
+      renderSkills();
+      validate();
+    }
+
+    function updateGold() {
+      let cost = 0;
+      const slotCategory = { helmet:'helmets', armor:'armors', weapon:'weapons', boots:'boots' };
+      for (const [slot, name] of Object.entries(equip)) {
+        if (!name) continue;
+        const cat = equipData[slotCategory[slot]];
+        if (cat && cat[name]) cost += cat[name].cost;
+      }
+      const remaining = INITIAL_GOLD - cost;
+      document.getElementById('goldDisplay').textContent = remaining;
+      document.getElementById('goldDisplay').style.color = remaining < 0 ? '#e94560' : '#f0a500';
+    }
+
+    function renderSkills() {
+      const container = document.getElementById('skillSelect');
+      const candidates = [];
+      const slotCategory = { helmet:'helmets', armor:'armors', weapon:'weapons', boots:'boots' };
+
+      for (const [slot, name] of Object.entries(equip)) {
+        if (!name) continue;
+        const cat = equipData[slotCategory[slot]];
+        if (cat && cat[name]) candidates.push(cat[name].skill.name);
+      }
+
+      if (candidates.length === 0) {
+        container.innerHTML = '<span style="color:#666">장비를 먼저 선택하세요</span>';
+        return;
+      }
+
+      selectedSkills = selectedSkills.filter(s => candidates.includes(s));
+
+      container.innerHTML = candidates.map(name => {
+        const isSelected = selectedSkills.includes(name);
+        const isFull = selectedSkills.length >= 3 && !isSelected;
+        return `<div class="skill-chip ${isSelected ? 'selected' : ''} ${isFull ? 'disabled' : ''}"
+                  onclick="${isFull ? '' : `toggleSkill('${name}')`}">${name}</div>`;
+      }).join('');
+      validate();
+    }
+
+    function toggleSkill(name) {
+      const idx = selectedSkills.indexOf(name);
+      if (idx >= 0) {
+        selectedSkills.splice(idx, 1);
+      } else if (selectedSkills.length < 3) {
+        selectedSkills.push(name);
+      }
+      renderSkills();
+    }
+
+    function validate() {
+      const cost = getTotalCost();
+      const valid = selectedClass
+        && Object.values(equip).every(v => v)
+        && selectedSkills.length === 3
+        && cost <= INITIAL_GOLD;
+      document.getElementById('submitBtn').disabled = !valid;
+      document.getElementById('aiBtn').disabled = !valid;
+    }
+
+    function getTotalCost() {
+      let cost = 0;
+      const slotCategory = { helmet:'helmets', armor:'armors', weapon:'weapons', boots:'boots' };
+      for (const [slot, name] of Object.entries(equip)) {
+        if (!name) continue;
+        const cat = equipData[slotCategory[slot]];
+        if (cat && cat[name]) cost += cat[name].cost;
+      }
+      return cost;
+    }
+
+    function submitBuild() {
+      try {
+        const build = makeBuild();
+        if (!build) return;
+        socket.emit('submitBuild', build);
+        document.getElementById('submitBtn').disabled = true;
+        document.getElementById('submitBtn').textContent = '대기중...';
+      } catch (e) {
+        console.error('빌드 생성 실패', e);
+        alert('빌드 생성 실패: ' + e.message);
+      }
+    }
+
+    function fightAI() {
+      try {
+        const build = makeBuild();
+        if (!build) return;
+        build.playerName = myName;
+        socket.emit('fightAI', build);
+        document.getElementById('aiBtn').disabled = true;
+        document.getElementById('aiBtn').textContent = '매칭중...';
+      } catch (e) {
+        console.error('빌드 생성 실패', e);
+        alert('빌드 생성 실패: ' + e.message);
+      }
+    }
+
+    function makeBuild() {
+      const cls = classData[selectedClass];
+      if (!cls) throw new Error('병과를 선택하세요');
+      const slotCategory = { helmet:'helmets', armor:'armors', weapon:'weapons', boots:'boots' };
+      const STAT_WEIGHT = 3;
+
+      const equipStats = { ATK:0, DEF:0, INT:0, SPD:0 };
+      for (const [slot, name] of Object.entries(equip)) {
+        if (!name) continue;
+        for (const [k, v] of Object.entries(equipData[slotCategory[slot]][name].stats)) {
+          if (equipStats[k] !== undefined) equipStats[k] += v;
+        }
+      }
+
+      return {
+        className: selectedClass,
+        passive: cls.passive,
+        stats: {
+          maxHP: cls.baseHP + stats.DEF * 15,
+          ATK: cls.baseATK + stats.ATK + equipStats.ATK,
+          DEF: cls.baseDEF + stats.DEF + equipStats.DEF,
+          INT: stats.INT + (equipStats.INT || 0),
+          SPD: cls.baseSPD + stats.SPD + (equipStats.SPD || 0),
+        },
+        range: cls.range,
+        btWeights: {
+          survive: cls.btWeights.survive + stats.DEF * STAT_WEIGHT,
+          skill: cls.btWeights.skill + stats.INT * STAT_WEIGHT,
+          attack: cls.btWeights.attack + stats.ATK * STAT_WEIGHT,
+        },
+        equip: { ...equip },
+        skills: selectedSkills.map(name => {
+          for (const [slot, itemName] of Object.entries(equip)) {
+            const item = equipData[slotCategory[slot]][itemName];
+            if (item.skill.name === name) return { ...item.skill };
+          }
+          return null;
+        }).filter(Boolean),
+        cost: getTotalCost(),
+      };
+    }
+
+    // ─── 전투 화면 ───
+    const canvas = document.getElementById('battle-canvas');
+    const ctx = canvas.getContext('2d');
+    const classColors = { '전사':'#e94560', '마법사':'#7b2ff7', '도적':'#2ecc71', '기사':'#3498db', '궁수':'#f39c12' };
+    let battleChars = [];
+
+    socket.on('battleStart', ({ totalTicks }) => {
+      showScreen('battle-screen');
+      document.getElementById('tickInfo').textContent = `총 ${totalTicks}틱`;
+    });
+
+    socket.on('battleTick', (data) => {
+      battleChars = data.state;
+      renderBattle(data.tick);
+    });
+
+    function renderBattle(tick) {
+      const hpEl = document.getElementById('hpBars');
+      hpEl.innerHTML = battleChars.map(c => {
+        const pct = Math.max(0, c.hp / c.maxHP * 100);
+        const color = c.alive ? (classColors[c.className] || '#e94560') : '#555';
+        return `<div class="hp-bar-container">
+          <div class="char-name" style="color:${color}">${c.name} (${c.className || '?'})</div>
+          <div class="hp-bar-bg"><div class="hp-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+          <div class="hp-text">${c.hp}/${c.maxHP}</div>
+        </div>`;
+      }).join('');
+
+      ctx.clearRect(0, 0, 800, 300);
+
+      // 바닥
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fillRect(0, 230, 800, 70);
+      ctx.strokeStyle = '#333';
+      ctx.beginPath();
+      ctx.moveTo(0, 230);
+      ctx.lineTo(800, 230);
+      ctx.stroke();
+
+      // 캐릭터
+      for (const c of battleChars) {
+        const sx = c.x;
+        const sy = 180;
+        const color = c.alive ? (classColors[c.className] || '#e94560') : '#555';
+
+        if (!c.alive) ctx.globalAlpha = 0.3;
+
+        // 몸체
+        ctx.fillStyle = color;
+        ctx.fillRect(sx - 12, sy - 30, 24, 40);
+
+        // 머리
+        ctx.beginPath();
+        ctx.arc(sx, sy - 40, 12, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 이름
+        ctx.fillStyle = '#fff';
+        ctx.font = '11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(c.name, sx, sy + 20);
+
+        ctx.globalAlpha = 1;
+      }
+
+      document.getElementById('tickInfo').textContent = `틱: ${tick}`;
+    }
+
+    // ─── 결과 ───
+    socket.on('battleEnd', ({ results }) => {
+      showScreen('result-screen');
+      const el = document.getElementById('resultCards');
+      el.innerHTML = results.map(r => {
+        const rankClass = r.rank <= 3 ? `rank-${r.rank}` : '';
+        return `<div class="result-card">
+          <div class="rank ${rankClass}">${r.rank}등</div>
+          <div>
+            <div style="font-weight:bold">${r.name} (${r.className})</div>
+            <div style="color:#aaa">HP: ${r.hpRemaining}</div>
+            <div class="reward-gold">+${r.reward.gold}G</div>
+          </div>
+        </div>`;
+      }).join('');
+    });
+
+    function backToWorkshop() {
+      showScreen(soloPlay ? 'lobby' : 'workshop');
+      if (!soloPlay) initWorkshop();
+    }
+
+    socket.on('error', (msg) => alert(msg));
+  </script>
+</body>
+</html>

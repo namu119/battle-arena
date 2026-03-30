@@ -1,0 +1,70 @@
+{
+  "helmets": {
+    "화염투구": {
+      "slot": "helmet", "cost": 150,
+      "stats": { "ATK": 3, "DEF": 2 },
+      "skill": { "name": "화염방벽", "type": "defense", "damage": 0, "shield": 20, "cooldown": 8, "description": "불의 방벽으로 피해 흡수" }
+    },
+    "얼음투구": {
+      "slot": "helmet", "cost": 150,
+      "stats": { "ATK": 1, "DEF": 4 },
+      "skill": { "name": "빙결보호막", "type": "defense", "damage": 0, "shield": 30, "cooldown": 10, "description": "얼음 보호막 생성" }
+    },
+    "바람투구": {
+      "slot": "helmet", "cost": 200,
+      "stats": { "ATK": 2, "DEF": 2, "SPD": 2 },
+      "skill": { "name": "질풍회피", "type": "buff", "damage": 0, "duration": 5, "cooldown": 12, "description": "회피율 대폭 상승" }
+    }
+  },
+  "armors": {
+    "가죽갑옷": {
+      "slot": "armor", "cost": 150,
+      "stats": { "DEF": 4, "SPD": 1 },
+      "skill": { "name": "긴급회피", "type": "defense", "damage": 0, "cooldown": 6, "description": "다음 공격 1회 회피" }
+    },
+    "철갑옷": {
+      "slot": "armor", "cost": 200,
+      "stats": { "DEF": 8 },
+      "skill": { "name": "철벽방어", "type": "defense", "damage": 0, "shield": 40, "cooldown": 12, "description": "강력한 방어 태세" }
+    },
+    "마법로브": {
+      "slot": "armor", "cost": 250,
+      "stats": { "DEF": 2, "INT": 5 },
+      "skill": { "name": "마력증폭", "type": "buff", "damage": 0, "duration": 6, "cooldown": 10, "description": "스킬 데미지 50% 증가" }
+    }
+  },
+  "weapons": {
+    "단검": {
+      "slot": "weapon", "cost": 100,
+      "stats": { "ATK": 5, "SPD": 2 },
+      "skill": { "name": "연속찌르기", "type": "attack", "damage": 15, "hits": 3, "cooldown": 5, "description": "빠른 3연타" }
+    },
+    "대검": {
+      "slot": "weapon", "cost": 200,
+      "stats": { "ATK": 12 },
+      "skill": { "name": "강타", "type": "attack", "damage": 40, "hits": 1, "cooldown": 8, "description": "강력한 일격" }
+    },
+    "지팡이": {
+      "slot": "weapon", "cost": 250,
+      "stats": { "ATK": 3, "INT": 8 },
+      "skill": { "name": "마력폭발", "type": "attack", "damage": 35, "aoe": true, "cooldown": 10, "description": "범위 마법 공격" }
+    }
+  },
+  "boots": {
+    "경량부츠": {
+      "slot": "boots", "cost": 100,
+      "stats": { "SPD": 3 },
+      "skill": { "name": "대시", "type": "movement", "damage": 0, "cooldown": 4, "description": "빠르게 이동" }
+    },
+    "중갑부츠": {
+      "slot": "boots", "cost": 150,
+      "stats": { "DEF": 4, "SPD": 1 },
+      "skill": { "name": "지진밟기", "type": "attack", "damage": 20, "aoe": true, "cooldown": 8, "description": "주변 적에게 피해" }
+    },
+    "질풍부츠": {
+      "slot": "boots", "cost": 200,
+      "stats": { "SPD": 5, "ATK": 2 },
+      "skill": { "name": "질풍돌진", "type": "attack", "damage": 25, "cooldown": 6, "description": "돌진하며 공격" }
+    }
+  }
+}

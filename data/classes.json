@@ -1,0 +1,84 @@
+{
+  "전사": {
+    "name": "전사",
+    "baseHP": 500,
+    "baseATK": 12,
+    "baseDEF": 8,
+    "baseSPD": 5,
+    "range": 60,
+    "btWeights": { "survive": 20, "skill": 30, "attack": 50 },
+    "passive": {
+      "name": "투지",
+      "description": "HP 30% 이하 시 공격력 25% 증가",
+      "trigger": "hp_below",
+      "threshold": 0.3,
+      "effect": { "atkMul": 1.25 }
+    },
+    "description": "근접 전투에 특화된 병종. 높은 체력과 공격력."
+  },
+  "마법사": {
+    "name": "마법사",
+    "baseHP": 320,
+    "baseATK": 6,
+    "baseDEF": 4,
+    "baseSPD": 4,
+    "range": 200,
+    "btWeights": { "survive": 30, "skill": 60, "attack": 10 },
+    "passive": {
+      "name": "마력순환",
+      "description": "스킬 사용 후 다음 스킬 쿨타임 20% 감소",
+      "trigger": "on_skill_use",
+      "effect": { "cooldownReduction": 0.2 }
+    },
+    "description": "원거리 스킬 위주. 강력한 범위 공격."
+  },
+  "도적": {
+    "name": "도적",
+    "baseHP": 380,
+    "baseATK": 10,
+    "baseDEF": 5,
+    "baseSPD": 9,
+    "range": 50,
+    "btWeights": { "survive": 10, "skill": 40, "attack": 50 },
+    "passive": {
+      "name": "급소공격",
+      "description": "기본공격 시 20% 확률로 치명타 (1.5배)",
+      "trigger": "on_attack",
+      "chance": 0.2,
+      "effect": { "critMul": 1.5 }
+    },
+    "description": "빠른 공격과 암살에 특화."
+  },
+  "기사": {
+    "name": "기사",
+    "baseHP": 600,
+    "baseATK": 8,
+    "baseDEF": 12,
+    "baseSPD": 3,
+    "range": 60,
+    "btWeights": { "survive": 50, "skill": 20, "attack": 30 },
+    "passive": {
+      "name": "철벽의지",
+      "description": "받는 피해 10% 고정 감소",
+      "trigger": "on_damaged",
+      "effect": { "damageReduction": 0.1 }
+    },
+    "description": "탱킹과 생존에 특화. 아군을 보호."
+  },
+  "궁수": {
+    "name": "궁수",
+    "baseHP": 350,
+    "baseATK": 11,
+    "baseDEF": 5,
+    "baseSPD": 7,
+    "range": 250,
+    "btWeights": { "survive": 20, "skill": 50, "attack": 30 },
+    "passive": {
+      "name": "명사수",
+      "description": "타겟과 거리가 멀수록 공격력 증가 (최대 20%)",
+      "trigger": "on_attack",
+      "effect": { "distanceAtkBonus": 0.2, "maxRange": 250 }
+    },
+    "description": "원거리 물리 공격. 안전거리 유지."
+  }
+}
