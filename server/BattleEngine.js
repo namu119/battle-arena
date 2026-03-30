@@ -56,6 +56,7 @@ class BattleEngine {
   /** 한 틱 처리 */
   processTick() {
     this.tick++;
+    this.tickEvents = [];
 
     const aliveChars = this.characters.filter(c => c.alive);
 
@@ -91,6 +92,7 @@ class BattleEngine {
         y: Math.round(c.y),
         alive: c.alive,
       })),
+      events: this.tickEvents,
     });
   }
 
@@ -146,7 +148,7 @@ class BattleEngine {
     }
 
     damage = Math.round(damage);
-    this.applyDamage(target, damage);
+    this.applyDamage(target, damage, attacker.id, null, this.tickEvents);
   }
 
   /** 스킬 사용 */
@@ -155,6 +157,8 @@ class BattleEngine {
     if (!skillData || skillData.currentCooldown > 0) return;
 
     skillData.currentCooldown = skillData.cooldown;
+
+    this.tickEvents.push({ type: 'skill', caster: caster.id, skillName: skillData.name, skillType: skillData.type, aoe: !!skillData.aoe });
 
     // 패시브: 마력순환 (마법사)
     if (caster.passive?.trigger === 'on_skill_use') {
@@ -174,7 +178,7 @@ class BattleEngine {
           );
           const dmg = (skillData.damage + caster.stats.INT * 2) * DAMAGE_SCALE;
           for (const t of nearby) {
-            this.applyDamage(t, Math.round(dmg));
+            this.applyDamage(t, Math.round(dmg), caster.id, skillData.name, this.tickEvents);
           }
         } else {
           // 단일 공격
@@ -183,7 +187,7 @@ class BattleEngine {
             const hits = skillData.hits || 1;
             const dmgPerHit = Math.round((skillData.damage + caster.stats.ATK) * DAMAGE_SCALE / hits);
             for (let i = 0; i < hits; i++) {
-              if (target.alive) this.applyDamage(target, dmgPerHit);
+              if (target.alive) this.applyDamage(target, dmgPerHit, caster.id, skillData.name, this.tickEvents);
             }
           }
         }
@@ -251,22 +255,26 @@ class BattleEngine {
   }
 
   /** 데미지 적용 */
-  applyDamage(target, damage) {
+  applyDamage(target, damage, attackerId, skillName, tickEvents) {
     // 쉴드 먼저 소모
     const shield = target.buffs.find(b => b.type === 'shield');
     if (shield) {
       if (shield.value >= damage) {
         shield.value -= damage;
+        if (tickEvents) tickEvents.push({ type: 'damage', from: attackerId, to: target.id, amount: 0, skill: skillName || null });
         return;
       }
       damage -= shield.value;
       target.buffs = target.buffs.filter(b => b !== shield);
     }
 
+    const actualDamageDealt = Math.min(damage, target.hp);
     target.hp = Math.max(0, target.hp - damage);
-    if (target.hp <= 0) {
+    if (tickEvents) tickEvents.push({ type: 'damage', from: attackerId, to: target.id, amount: actualDamageDealt, skill: skillName || null });
+    if (target.hp <= 0 && target.alive) {
       target.alive = false;
       target.deathTick = this.tick;
+      if (tickEvents) tickEvents.push({ type: 'death', target: target.id });
     }
   }
 

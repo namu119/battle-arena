@@ -151,7 +151,7 @@
       width: 100%;
       max-width: 800px;
       height: auto;
-      aspect-ratio: 8 / 3;
+      aspect-ratio: 2 / 1;
       display: block;
     }
     .hp-bars {
@@ -431,8 +431,11 @@
       const el = document.getElementById('roomList');
       if (list.length === 0) { el.innerHTML = '<p style="color:#aaa">열린 방 없음</p>'; return; }
       el.innerHTML = list.map(r =>
-        `<div style="margin:5px"><button class="btn btn-secondary" onclick="joinRoom('${r.id}')">${r.id.slice(-6)} (${r.players}/${r.max})</button></div>`
+        `<div style="margin:5px"><button class="btn btn-secondary" data-room-id="${esc(r.id)}">${esc(r.id.slice(-6))} (${Number(r.players)}/${Number(r.max)})</button></div>`
       ).join('');
+      el.querySelectorAll('[data-room-id]').forEach(btn => {
+        btn.addEventListener('click', () => joinRoom(btn.dataset.roomId));
+      });
     });
 
     function soloMode() {
@@ -592,8 +595,11 @@
         const isSelected = selectedSkills.includes(name);
         const isFull = selectedSkills.length >= 3 && !isSelected;
         return `<div class="skill-chip ${isSelected ? 'selected' : ''} ${isFull ? 'disabled' : ''}"
-                  onclick="${isFull ? '' : `toggleSkill('${name}')`}">${name}</div>`;
+                  data-skill="${esc(name)}">${esc(name)}</div>`;
       }).join('');
+      container.querySelectorAll('.skill-chip:not(.disabled)').forEach(chip => {
+        chip.addEventListener('click', () => toggleSkill(chip.dataset.skill));
+      });
       validate();
     }
 
@@ -702,39 +708,534 @@
     const ctx = canvas.getContext('2d');
     const classColors = { '전사':'#e94560', '마법사':'#7b2ff7', '도적':'#2ecc71', '기사':'#3498db', '궁수':'#f39c12' };
     let battleChars = [];
+    let animations = [];
+    let animFrameId = null;
+    let isBattleActive = false;
+    const deadAnimated = new Set(); // track characters whose death animation already played
+    const ARENA_WIDTH = 800;
+    const ARENA_HEIGHT = 400;
 
-    // 캔버스 크기를 CSS 표시 크기에 맞게 조정
+    // ─── Task 2: Canvas resize (2:1 aspect) ───
     function resizeCanvas() {
       const container = canvas.parentElement;
       const w = Math.min(800, container.clientWidth - 20);
       canvas.width = w;
-      canvas.height = Math.round(w * 0.375); // 8:3 비율
+      canvas.height = Math.round(w * 0.5); // 2:1 ratio
     }
 
     resizeCanvas();
     window.addEventListener('resize', () => {
       resizeCanvas();
-      // 현재 상태로 다시 렌더링 (전투 중일 때)
-      if (battleChars.length > 0) {
-        renderBattle(null);
+      if (battleChars.length > 0 && !isBattleActive) {
+        renderFrame();
       }
     });
 
+    // ─── Task 2: Diamond field rendering ───
+    function getDiamondParams(W, H) {
+      const cx = W / 2;
+      const cy = H * 0.62;
+      const dw = W * 0.45; // half-width of diamond
+      const dh = H * 0.30; // half-height of diamond
+      return { cx, cy, dw, dh };
+    }
+
+    function drawDiamondField(W, H) {
+      const { cx, cy, dw, dh } = getDiamondParams(W, H);
+
+      // Fill background
+      ctx.fillStyle = '#0f3460';
+      ctx.fillRect(0, 0, W, H);
+
+      // Diamond floor
+      ctx.fillStyle = '#0f2847';
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - dh);       // top
+      ctx.lineTo(cx + dw, cy);       // right
+      ctx.lineTo(cx, cy + dh);       // bottom
+      ctx.lineTo(cx - dw, cy);       // left
+      ctx.closePath();
+      ctx.fill();
+
+      // Grid lines parallel to diamond edges
+      ctx.strokeStyle = '#1a3a5c';
+      ctx.lineWidth = 1;
+      const gridCount = 6;
+      for (let i = 1; i < gridCount; i++) {
+        const t = i / gridCount;
+        // Lines parallel to top-right edge (from left edge to bottom edge)
+        ctx.beginPath();
+        const lx1 = cx + (-dw) * (1 - t) + 0 * t;
+        const ly1 = cy + 0 * (1 - t) + (-dh) * t;
+        const lx2 = cx + 0 * (1 - t) + dw * t;
+        const ly2 = cy + dh * (1 - t) + 0 * t;
+        ctx.moveTo(lx1, ly1);
+        ctx.lineTo(lx2, ly2);
+        ctx.stroke();
+
+        // Lines parallel to top-left edge (from right edge to bottom edge)
+        ctx.beginPath();
+        const rx1 = cx + dw * (1 - t) + 0 * t;
+        const ry1 = cy + 0 * (1 - t) + (-dh) * t;
+        const rx2 = cx + 0 * (1 - t) + (-dw) * t;
+        const ry2 = cy + dh * (1 - t) + 0 * t;
+        ctx.moveTo(rx1, ry1);
+        ctx.lineTo(rx2, ry2);
+        ctx.stroke();
+      }
+    }
+
+    // ─── Task 3: Coordinate transformation ───
+    function serverToQuarterView(serverX, syntheticY, W, H) {
+      const { cx, cy, dw, dh } = getDiamondParams(W, H);
+      // Normalize server coords to -1..1
+      const normX = (serverX / ARENA_WIDTH) * 2 - 1;  // -1 to 1
+      const normY = (syntheticY / ARENA_HEIGHT) * 2 - 1; // -1 to 1
+      // Isometric projection onto diamond
+      const qvX = cx + (normX - normY) * dw * 0.5;
+      const qvY = cy + (normX + normY) * dh * 0.5;
+      return { qvX, qvY };
+    }
+
+    function getDepthScale(qvY, H, isMobile) {
+      const { cy, dh } = getDiamondParams(canvas.width, H);
+      const minY = cy - dh;
+      const maxY = cy + dh;
+      const t = Math.max(0, Math.min(1, (qvY - minY) / (maxY - minY)));
+      if (isMobile) return 0.85 + t * 0.15; // 0.85-1.0 on mobile
+      return 0.8 + t * 0.2; // 0.8-1.0 on desktop
+    }
+
+    // ─── Task 4: Geometric character rendering ───
+    function drawCharacter(ctx, char, qvX, qvY, scale, deathProgress) {
+      const color = char.alive || deathProgress !== undefined
+        ? (classColors[char.className] || '#e94560') : '#555';
+      const baseSize = 14 * scale;
+
+      ctx.save();
+      ctx.translate(qvX, qvY);
+
+      // Death animation: shrink + fade
+      if (deathProgress !== undefined) {
+        const shrink = 1.0 - deathProgress * 0.7; // 1.0 -> 0.3
+        const alpha = 1.0 - deathProgress;
+        ctx.globalAlpha = Math.max(0, alpha);
+        ctx.scale(shrink, shrink);
+      } else if (!char.alive) {
+        // Ghost state after death animation
+        ctx.globalAlpha = 0.3;
+      }
+
+      // Shadow ellipse
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, baseSize * 1.2, baseSize * 0.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Legs (short stubby legs like reference)
+      const legW = baseSize * 0.25;
+      const legH = baseSize * 0.4;
+      ctx.fillStyle = darkenColor(color, 0.7);
+      ctx.fillRect(-baseSize * 0.35, -legH, legW, legH);
+      ctx.fillRect(baseSize * 0.1, -legH, legW, legH);
+
+      // Body (thick rounded trapezoid)
+      const bodyW = baseSize * 1.1;
+      const bodyH = baseSize * 1.2;
+      const bodyTop = -legH - bodyH;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(-bodyW * 0.45, -legH);
+      ctx.lineTo(-bodyW * 0.38, bodyTop);
+      ctx.quadraticCurveTo(0, bodyTop - bodyH * 0.1, bodyW * 0.38, bodyTop);
+      ctx.lineTo(bodyW * 0.45, -legH);
+      ctx.closePath();
+      ctx.fill();
+
+      // Class icon on body
+      const iconY = bodyTop + bodyH * 0.5;
+      ctx.strokeStyle = '#fff';
+      ctx.fillStyle = '#fff';
+      ctx.lineWidth = Math.max(1, scale * 1.5);
+      drawClassIcon(ctx, char.className, 0, iconY, baseSize * 0.3);
+
+      // Head (round like reference)
+      const headR = baseSize * 0.5;
+      const headY = bodyTop - headR * 0.7;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(0, headY, headR, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Eyes
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(-headR * 0.3, headY - headR * 0.1, headR * 0.15, 0, Math.PI * 2);
+      ctx.arc(headR * 0.3, headY - headR * 0.1, headR * 0.15, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Weapon line
+      drawWeapon(ctx, char.className, bodyW, bodyTop, baseSize, color);
+
+      ctx.restore();
+
+      // Name label below shadow (not affected by death transform)
+      if (deathProgress === undefined || deathProgress < 0.8) {
+        const isMobile = canvas.width < 400;
+        const fontSize = Math.max(8, Math.round((isMobile ? 9 : 11) * scale));
+        ctx.fillStyle = '#fff';
+        ctx.font = `${fontSize}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.globalAlpha = deathProgress !== undefined ? Math.max(0, 1 - deathProgress) : (char.alive ? 1 : 0.3);
+        ctx.fillText(char.name, qvX, qvY + baseSize * 0.8);
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    function drawClassIcon(ctx, className, x, y, size) {
+      ctx.save();
+      ctx.translate(x, y);
+      switch (className) {
+        case '전사': // Sword cross
+          ctx.beginPath();
+          ctx.moveTo(-size, 0); ctx.lineTo(size, 0);
+          ctx.moveTo(0, -size); ctx.lineTo(0, size);
+          ctx.stroke();
+          break;
+        case '마법사': // Star/asterisk
+          for (let i = 0; i < 6; i++) {
+            const a = (i / 6) * Math.PI * 2;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(a) * size, Math.sin(a) * size);
+            ctx.stroke();
+          }
+          break;
+        case '도적': // Diagonal slash
+          ctx.beginPath();
+          ctx.moveTo(-size, size * 0.5);
+          ctx.lineTo(size, -size * 0.5);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(-size * 0.5, size);
+          ctx.lineTo(size * 0.5, -size);
+          ctx.stroke();
+          break;
+        case '기사': // Shield outline
+          ctx.strokeRect(-size * 0.6, -size * 0.7, size * 1.2, size * 1.4);
+          ctx.beginPath();
+          ctx.moveTo(0, -size * 0.4); ctx.lineTo(0, size * 0.4);
+          ctx.moveTo(-size * 0.3, 0); ctx.lineTo(size * 0.3, 0);
+          ctx.stroke();
+          break;
+        case '궁수': // Arrow/triangle pointing right
+          ctx.beginPath();
+          ctx.moveTo(-size * 0.5, -size * 0.6);
+          ctx.lineTo(size * 0.7, 0);
+          ctx.lineTo(-size * 0.5, size * 0.6);
+          ctx.closePath();
+          ctx.stroke();
+          break;
+      }
+      ctx.restore();
+    }
+
+    function drawWeapon(ctx, className, bodyW, bodyTop, baseSize, color) {
+      ctx.strokeStyle = '#ccc';
+      ctx.lineWidth = Math.max(1, baseSize * 0.1);
+      const weaponLen = baseSize * 0.9;
+      switch (className) {
+        case '전사': // Sword right
+          ctx.beginPath();
+          ctx.moveTo(bodyW * 0.45, bodyTop + baseSize * 0.3);
+          ctx.lineTo(bodyW * 0.45 + weaponLen, bodyTop);
+          ctx.stroke();
+          break;
+        case '마법사': // Staff up
+          ctx.beginPath();
+          ctx.moveTo(bodyW * 0.4, bodyTop + baseSize * 0.5);
+          ctx.lineTo(bodyW * 0.35, bodyTop - baseSize * 0.8);
+          ctx.stroke();
+          // Orb at top
+          ctx.fillStyle = '#7ec8e3';
+          ctx.beginPath();
+          ctx.arc(bodyW * 0.35, bodyTop - baseSize * 0.9, baseSize * 0.15, 0, Math.PI * 2);
+          ctx.fill();
+          break;
+        case '도적': // Dagger
+          ctx.beginPath();
+          ctx.moveTo(bodyW * 0.4, bodyTop + baseSize * 0.4);
+          ctx.lineTo(bodyW * 0.4 + weaponLen * 0.6, bodyTop + baseSize * 0.1);
+          ctx.stroke();
+          break;
+        case '기사': // Shield on left, sword right
+          // Shield
+          ctx.fillStyle = darkenColor(color, 0.6);
+          ctx.fillRect(-bodyW * 0.5 - baseSize * 0.3, bodyTop + baseSize * 0.1, baseSize * 0.35, baseSize * 0.5);
+          // Sword
+          ctx.beginPath();
+          ctx.moveTo(bodyW * 0.45, bodyTop + baseSize * 0.3);
+          ctx.lineTo(bodyW * 0.45 + weaponLen * 0.8, bodyTop);
+          ctx.stroke();
+          break;
+        case '궁수': // Bow (curved)
+          ctx.beginPath();
+          ctx.moveTo(-bodyW * 0.4, bodyTop + baseSize * 0.1);
+          ctx.quadraticCurveTo(-bodyW * 0.4 - baseSize * 0.4, bodyTop + baseSize * 0.5, -bodyW * 0.4, bodyTop + baseSize * 0.9);
+          ctx.stroke();
+          // Arrow
+          ctx.beginPath();
+          ctx.moveTo(-bodyW * 0.35, bodyTop + baseSize * 0.5);
+          ctx.lineTo(-bodyW * 0.35 - weaponLen * 0.8, bodyTop + baseSize * 0.5);
+          ctx.stroke();
+          break;
+      }
+    }
+
+    function darkenColor(hex, factor) {
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      return `rgb(${Math.round(r * factor)},${Math.round(g * factor)},${Math.round(b * factor)})`;
+    }
+
+    // ─── Task 5: Animation system ───
+    function spawnDamageNumber(x, y, amount, isSkill) {
+      animations.push({
+        type: 'damage',
+        x, y,
+        startY: y,
+        amount,
+        isSkill,
+        born: performance.now(),
+        duration: 1000,
+      });
+    }
+
+    // ─── Task 6: Skill effect animations ───
+    function spawnSkillName(x, y, skillName) {
+      animations.push({
+        type: 'skillName',
+        x, y,
+        startY: y,
+        text: skillName,
+        born: performance.now(),
+        duration: 900,
+      });
+    }
+
+    function spawnAoeEffect(x, y, color) {
+      animations.push({
+        type: 'aoe',
+        x, y,
+        color,
+        born: performance.now(),
+        duration: 600,
+      });
+    }
+
+    function spawnProjectile(fromX, fromY, toX, toY, color) {
+      animations.push({
+        type: 'projectile',
+        fromX, fromY, toX, toY,
+        color,
+        born: performance.now(),
+        duration: 400,
+      });
+    }
+
+    function spawnBuffEffect(x, y, color) {
+      animations.push({
+        type: 'buff',
+        x, y,
+        color,
+        born: performance.now(),
+        duration: 700,
+      });
+    }
+
+    // ─── Task 7: Death animation ───
+    function spawnDeathEffect(x, y, color, charId) {
+      // Death shrink/fade is handled by drawCharacter via deathAnims map
+      deathAnims.set(charId, { born: performance.now(), duration: 800 });
+      // Particle burst
+      for (let i = 0; i < 6; i++) {
+        const angle = (i / 6) * Math.PI * 2 + Math.random() * 0.5;
+        const speed = 30 + Math.random() * 40;
+        animations.push({
+          type: 'particle',
+          x, y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          color,
+          born: performance.now(),
+          duration: 800,
+        });
+      }
+    }
+    const deathAnims = new Map(); // charId -> { born, duration }
+
+    function drawEffect(ctx, effect, now) {
+      const elapsed = now - effect.born;
+      const t = Math.min(1, elapsed / effect.duration);
+      const alpha = 1 - t;
+
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, alpha);
+
+      switch (effect.type) {
+        case 'damage': {
+          const isMobile = canvas.width < 400;
+          const fontSize = effect.isSkill
+            ? Math.max(12, Math.round(isMobile ? 14 : 18))
+            : Math.max(10, Math.round(isMobile ? 12 : 15));
+          ctx.font = `bold ${fontSize}px sans-serif`;
+          ctx.textAlign = 'center';
+          const dy = -40 * t;
+          const x = effect.x;
+          const y = effect.startY + dy;
+          // Outline for readability
+          ctx.strokeStyle = '#000';
+          ctx.lineWidth = 3;
+          ctx.strokeText(effect.amount, x, y);
+          ctx.fillStyle = effect.isSkill ? '#ffd700' : '#fff';
+          ctx.fillText(effect.amount, x, y);
+          break;
+        }
+        case 'skillName': {
+          const fontSize = Math.max(10, Math.round(14));
+          ctx.font = `bold ${fontSize}px sans-serif`;
+          ctx.textAlign = 'center';
+          const dy = -30 * t;
+          ctx.strokeStyle = '#000';
+          ctx.lineWidth = 2;
+          ctx.strokeText(effect.text, effect.x, effect.startY + dy);
+          ctx.fillStyle = '#7ec8e3';
+          ctx.fillText(effect.text, effect.x, effect.startY + dy);
+          break;
+        }
+        case 'aoe': {
+          const maxR = 40;
+          const r = maxR * t;
+          ctx.strokeStyle = effect.color || '#7ec8e3';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, r, 0, Math.PI * 2);
+          ctx.stroke();
+          break;
+        }
+        case 'projectile': {
+          const px = effect.fromX + (effect.toX - effect.fromX) * Math.min(1, t * 2.5);
+          const py = effect.fromY + (effect.toY - effect.fromY) * Math.min(1, t * 2.5);
+          ctx.fillStyle = effect.color || '#fff';
+          ctx.beginPath();
+          ctx.arc(px, py, 4, 0, Math.PI * 2);
+          ctx.fill();
+          break;
+        }
+        case 'buff': {
+          const r = 15 + 10 * t;
+          ctx.strokeStyle = effect.color || '#3498db';
+          ctx.lineWidth = 2 + (1 - t) * 2;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, r, 0, Math.PI * 2);
+          ctx.stroke();
+          break;
+        }
+        case 'particle': {
+          const px = effect.x + effect.vx * t;
+          const py = effect.y + effect.vy * t;
+          ctx.fillStyle = effect.color;
+          ctx.fillRect(px - 2, py - 2, 4, 4);
+          break;
+        }
+      }
+      ctx.restore();
+    }
+
+    // ─── Main render frame ───
+    function renderFrame() {
+      const W = canvas.width;
+      const H = canvas.height;
+      const now = performance.now();
+      const isMobile = W < 400;
+
+      ctx.clearRect(0, 0, W, H);
+      drawDiamondField(W, H);
+
+      // Build sorted character list with quarter-view coords
+      const totalChars = battleChars.length;
+      const charsToDraw = battleChars.map((c, idx) => {
+        const syntheticY = (idx / Math.max(1, totalChars)) * ARENA_HEIGHT * 0.6 + ARENA_HEIGHT * 0.2;
+        const { qvX, qvY } = serverToQuarterView(c.x, syntheticY, W, H);
+        const depthScale = getDepthScale(qvY, H, isMobile);
+        return { char: c, qvX, qvY, depthScale };
+      });
+
+      // Painter's algorithm: sort by qvY (back to front)
+      charsToDraw.sort((a, b) => a.qvY - b.qvY);
+
+      for (const { char, qvX, qvY, depthScale } of charsToDraw) {
+        // Check death animation progress
+        let deathProgress;
+        const da = deathAnims.get(char.id);
+        if (da) {
+          const dt = (now - da.born) / da.duration;
+          if (dt < 1) {
+            deathProgress = dt;
+          }
+          // After animation done, character renders as ghost via drawCharacter (!char.alive path)
+        }
+        drawCharacter(ctx, char, qvX, qvY, depthScale, deathProgress);
+      }
+
+      // Draw animations (effects, damage numbers, particles)
+      for (let i = animations.length - 1; i >= 0; i--) {
+        const anim = animations[i];
+        if (now - anim.born > anim.duration) {
+          animations.splice(i, 1);
+          continue;
+        }
+        drawEffect(ctx, anim, now);
+      }
+    }
+
+    function animationLoop() {
+      renderFrame();
+      if (isBattleActive) {
+        animFrameId = requestAnimationFrame(animationLoop);
+      }
+    }
+
+    // ─── Helper: find character qv position at snapshot time ───
+    function getCharQV(charId) {
+      const W = canvas.width;
+      const H = canvas.height;
+      const totalChars = battleChars.length;
+      const idx = battleChars.findIndex(c => c.id === charId);
+      if (idx < 0) return null;
+      const c = battleChars[idx];
+      const syntheticY = (idx / Math.max(1, totalChars)) * ARENA_HEIGHT * 0.6 + ARENA_HEIGHT * 0.2;
+      return serverToQuarterView(c.x, syntheticY, W, H);
+    }
+
+    // ─── Socket events ───
     socket.on('battleStart', ({ totalTicks }) => {
       showScreen('battle-screen');
       resizeCanvas();
+      battleChars = [];
+      animations = [];
+      deathAnims.clear();
+      deadAnimated.clear();
+      isBattleActive = true;
       document.getElementById('tickInfo').textContent = `총 ${totalTicks}틱`;
+      animFrameId = requestAnimationFrame(animationLoop);
     });
 
     socket.on('battleTick', (data) => {
       battleChars = data.state;
-      renderBattle(data.tick);
-    });
 
-    function renderBattle(tick) {
-      const W = canvas.width;
-      const H = canvas.height;
-
+      // Update HP bars
       const hpEl = document.getElementById('hpBars');
       hpEl.innerHTML = battleChars.map(c => {
         const pct = Math.max(0, c.hp / c.maxHP * 100);
@@ -746,58 +1247,78 @@
         </div>`;
       }).join('');
 
-      ctx.clearRect(0, 0, W, H);
-
-      // 바닥 (하단 23% 영역)
-      const floorY = Math.round(H * 0.767);
-      ctx.fillStyle = '#1a1a2e';
-      ctx.fillRect(0, floorY, W, H - floorY);
-      ctx.strokeStyle = '#333';
-      ctx.beginPath();
-      ctx.moveTo(0, floorY);
-      ctx.lineTo(W, floorY);
-      ctx.stroke();
-
-      // 캐릭터 (원본 좌표계 800x300 → 현재 W x H 로 스케일)
-      const scaleX = W / 800;
-      const scaleY = H / 300;
-
-      for (const c of battleChars) {
-        const sx = Math.round(c.x * scaleX);
-        const sy = Math.round(180 * scaleY);
-        const color = c.alive ? (classColors[c.className] || '#e94560') : '#555';
-
-        if (!c.alive) ctx.globalAlpha = 0.3;
-
-        // 몸체
-        const bodyW = Math.round(24 * scaleX);
-        const bodyH = Math.round(40 * scaleY);
-        const headR = Math.round(12 * scaleX);
-        ctx.fillStyle = color;
-        ctx.fillRect(sx - bodyW / 2, sy - bodyH, bodyW, bodyH);
-
-        // 머리
-        ctx.beginPath();
-        ctx.arc(sx, sy - bodyH - headR * 0.8, headR, 0, Math.PI * 2);
-        ctx.fill();
-
-        // 이름
-        ctx.fillStyle = '#fff';
-        const fontSize = Math.max(9, Math.round(11 * scaleX));
-        ctx.font = `${fontSize}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.fillText(c.name, sx, sy + Math.round(20 * scaleY));
-
-        ctx.globalAlpha = 1;
+      if (data.tick !== null && data.tick !== undefined) {
+        document.getElementById('tickInfo').textContent = `틱: ${data.tick}`;
       }
 
-      if (tick !== null) {
-        document.getElementById('tickInfo').textContent = `틱: ${tick}`;
+      // Process events (Task 5, 6, 7)
+      const events = data.events || [];
+      for (const evt of events) {
+        switch (evt.type) {
+          case 'damage': {
+            if (evt.amount <= 0) break; // Skip fully-blocked (shield absorbed) hits
+            // Snapshot position at spawn time
+            const pos = getCharQV(evt.to);
+            if (pos) {
+              spawnDamageNumber(pos.qvX, pos.qvY - 20, evt.amount, !!evt.skill);
+            }
+            break;
+          }
+          case 'skill': {
+            const casterPos = getCharQV(evt.caster);
+            if (casterPos) {
+              const casterColor = (() => {
+                const c = battleChars.find(ch => ch.id === evt.caster);
+                return c ? (classColors[c.className] || '#7ec8e3') : '#7ec8e3';
+              })();
+              // Skill name
+              spawnSkillName(casterPos.qvX, casterPos.qvY - 40, evt.skillName);
+
+              if (evt.aoe) {
+                spawnAoeEffect(casterPos.qvX, casterPos.qvY, casterColor);
+              } else if (evt.skillType === 'defense' || evt.skillType === 'buff') {
+                spawnBuffEffect(casterPos.qvX, casterPos.qvY, casterColor);
+              } else {
+                // Single-target attack: find a target from damage events in same tick
+                const dmgEvt = events.find(e => e.type === 'damage' && e.skill && e.from === evt.caster);
+                if (dmgEvt) {
+                  const targetPos = getCharQV(dmgEvt.to);
+                  if (targetPos) {
+                    spawnProjectile(casterPos.qvX, casterPos.qvY, targetPos.qvX, targetPos.qvY, casterColor);
+                  }
+                }
+              }
+            }
+            break;
+          }
+          case 'death': {
+            if (!deadAnimated.has(evt.target)) {
+              deadAnimated.add(evt.target);
+              const pos = getCharQV(evt.target);
+              const c = battleChars.find(ch => ch.id === evt.target);
+              const color = c ? (classColors[c.className] || '#e94560') : '#e94560';
+              if (pos) {
+                spawnDeathEffect(pos.qvX, pos.qvY, color, evt.target);
+              }
+            }
+            break;
+          }
+        }
       }
-    }
+    });
 
     // ─── 결과 ───
     socket.on('battleEnd', ({ results }) => {
+      // Task 5: cleanup animation loop
+      isBattleActive = false;
+      if (animFrameId) {
+        cancelAnimationFrame(animFrameId);
+        animFrameId = null;
+      }
+      animations = [];
+      deathAnims.clear();
+      deadAnimated.clear();
+
       showScreen('result-screen');
       const el = document.getElementById('resultCards');
       el.innerHTML = results.map(r => {
@@ -814,6 +1335,11 @@
     });
 
     function backToWorkshop() {
+      isBattleActive = false;
+      if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
+      animations = [];
+      deathAnims.clear();
+      deadAnimated.clear();
       showScreen(soloPlay ? 'lobby' : 'workshop');
       if (!soloPlay) initWorkshop();
     }
