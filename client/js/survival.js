@@ -220,7 +220,8 @@ function survivalAnimLoop() {
 }
 
 // ─── Log System ───
-function survivalLogAdd(text, charIds) {
+// isCharLog: true = 캐릭터 전투 로그 (ON일때만 표시), false = 시스템 (항상 표시)
+function survivalLogAdd(text, charIds, isCharLog) {
   var ids = charIds || [];
   if (ids.length === 0 && G.survivalChars.length > 0) {
     for (var i = 0; i < G.survivalChars.length; i++) {
@@ -228,33 +229,31 @@ function survivalLogAdd(text, charIds) {
       if (!c.isMonster && text.includes(c.name)) ids.push(c.id);
     }
   }
-  G.logEntries.push({ text: text, charIds: ids });
-  if (G.logEntries.length > 50) G.logEntries.shift();
+  G.logEntries.push({ text: text, charIds: ids, isCharLog: !!isCharLog });
+  if (G.logEntries.length > 80) G.logEntries.shift();
   renderLog();
 }
 
-// 로그 필터: Set으로 관리 (빈 Set = 전체, charId 있으면 해당 캐릭터 포함)
+// 로그 필터: Set = ON된 캐릭터들. 시스템 로그는 항상, 캐릭터 로그는 ON일때만
 G.logFilterSet = new Set();
 
 function renderLog() {
   var el = document.getElementById('survivalLog');
   if (!el) return;
   el.innerHTML = '';
-  var filtered = G.logFilterSet.size === 0
-    ? G.logEntries
-    : G.logEntries.filter(function(e) {
-        // 시스템 로그(charIds 없음)는 항상 표시
-        if (e.charIds.length === 0) return true;
-        // 선택된 캐릭터 중 하나라도 관련되면 표시
-        for (var j = 0; j < e.charIds.length; j++) {
-          if (G.logFilterSet.has(e.charIds[j])) return true;
-        }
-        return false;
-      });
+  var filtered = G.logEntries.filter(function(e) {
+    // 시스템 로그 (charIds 비어있음) = 항상 표시
+    if (!e.isCharLog) return true;
+    // 캐릭터 로그 = ON된 캐릭터만 표시
+    for (var j = 0; j < e.charIds.length; j++) {
+      if (G.logFilterSet.has(e.charIds[j])) return true;
+    }
+    return false;
+  });
   var entries = filtered.slice(-30);
   for (var i = 0; i < entries.length; i++) {
     var entry = document.createElement('div');
-    entry.className = 'survival-log-entry';
+    entry.className = 'survival-log-entry' + (entries[i].isCharLog ? ' char-log' : ' system-log');
     entry.textContent = entries[i].text;
     el.appendChild(entry);
   }
@@ -268,11 +267,10 @@ function toggleLogFilter(charId) {
     G.logFilterSet.add(charId);
   }
   renderLog();
-  // HP카드 시각 업데이트는 다음 틱에서 자동 반영
 }
 
-function survivalNotify(text, color) {
-  survivalLogAdd(text);
+function survivalNotify(text, color, isCharLog) {
+  survivalLogAdd(text, null, !!isCharLog);
 }
 
 // ─── HP카드 탭 → 로그 필터 ───
@@ -373,7 +371,7 @@ G.socket.on('survivalTick', function(data) {
         var aName = attacker ? attacker.name : '?';
         var tName = target ? target.name : '?';
         var extra = evt.crit ? ' \uD83D\uDCA5크릿!' : evt.skill ? ' [' + evt.skill + ']' : '';
-        survivalLogAdd(aName + ' \u2192 ' + tName + ' ' + evt.amount + 'dmg' + extra);
+        survivalLogAdd(aName + ' \u2192 ' + tName + ' ' + evt.amount + 'dmg' + extra, null, true);
       }
     }
     if (evt.type === 'death' && !G.survivalDeadAnimated.has(evt.target)) {
@@ -386,7 +384,7 @@ G.socket.on('survivalTick', function(data) {
         G.survivalDeathAnims.set(evt.target, { born:performance.now(), duration:800 });
         var killer = evt.killedBy ? G.survivalChars.find(function(ch) { return ch.id === evt.killedBy; }) : null;
         if (dc.isMonster) {
-          survivalLogAdd('\u2620 ' + dc.name + ' 처치' + (killer ? ' by '+killer.name : ''));
+          survivalLogAdd('\u2620 ' + dc.name + ' 처치' + (killer ? ' by '+killer.name : ''), null, true);
         }
         if (!dc.isMonster) survivalNotify(dc.name + ' 사망!', '#e94560');
       }
@@ -394,19 +392,19 @@ G.socket.on('survivalTick', function(data) {
     if (evt.type === 'drop') {
       var slotNames = { helmet:'투구', armor:'갑옷', weapon:'무기', boots:'신발' };
       if (evt.dropType === 'enhancement') {
-        survivalNotify('\uD83D\uDD28 ' + (slotNames[evt.slot]||evt.slot) + ' +' + evt.level + ' 강화!', '#f0a500');
+        survivalNotify('\uD83D\uDD28 ' + (slotNames[evt.slot]||evt.slot) + ' +' + evt.level + ' 강화!', '#f0a500', true);
       } else if (evt.dropType === 'goldOverflow') {
-        survivalNotify('\uD83D\uDCB0 +' + evt.gold + 'G (' + (slotNames[evt.slot]) + ' MAX)', '#f0a500');
+        survivalNotify('\uD83D\uDCB0 +' + evt.gold + 'G (' + (slotNames[evt.slot]) + ' MAX)', '#f0a500', true);
       } else if (evt.dropType === 'goldEnhance') {
-        survivalNotify('\uD83D\uDCB0 골드 강화: ' + (slotNames[evt.slot]) + ' +' + evt.level, '#7ec8e3');
+        survivalNotify('\uD83D\uDCB0 골드 강화: ' + (slotNames[evt.slot]) + ' +' + evt.level, '#7ec8e3', true);
       } else if (evt.dropType === 'playerKill') {
-        survivalNotify('\u2694 ' + evt.victimName + ' 처치! +' + evt.gold + 'G' + (evt.stolenSlot ? ' +' + (slotNames[evt.stolenSlot]||evt.stolenSlot) + ' 탈취' : ''), '#ff4444');
+        survivalNotify('\u2694 ' + evt.victimName + ' 처치! +' + evt.gold + 'G' + (evt.stolenSlot ? ' +' + (slotNames[evt.stolenSlot]||evt.stolenSlot) + ' 탈취' : ''), '#ff4444', true);
       }
     }
     if (evt.type === 'skill') {
       var caster = G.survivalChars.find(function(c) { return c.id === evt.caster; });
       if (caster && !caster.isMonster) {
-        survivalLogAdd('\u2728 ' + caster.name + ' [' + evt.skillName + '] 사용');
+        survivalLogAdd('\u2728 ' + caster.name + ' [' + evt.skillName + '] 사용', null, true);
       }
     }
     if (evt.type === 'waveSpawn') {

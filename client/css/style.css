@@ -372,7 +372,18 @@ input {
 }
 .survival-hp-card { cursor: pointer; }
 .survival-hp-card:active { transform: scale(0.97); }
-.survival-hp-card.filter-active { border: 2px solid #e94560 !important; }
+.survival-hp-card.filter-active {
+  border: 2px solid #7ec8e3 !important;
+  box-shadow: 0 0 6px rgba(126,200,227,0.4);
+}
+.survival-hp-card.filter-active .hp-name::after {
+  content: ' ON';
+  font-size: 0.65em;
+  color: #7ec8e3;
+  font-weight: normal;
+}
+.survival-log-entry.char-log { color: #99bbdd; }
+.survival-log-entry.system-log { color: #f0a500; }
 .survival-log-entry {
   padding: 2px 0;
   border-bottom: 1px solid rgba(255,255,255,0.06);
