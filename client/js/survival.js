@@ -9,7 +9,7 @@ var CAMERA_SMOOTH = 0.1;
 var MAP_WIDTH = 1600;
 var GRID_COLS = 10;
 var GRID_ROWS = 6;
-var WALL_SERVER_X = [550, 1050];
+var WALL_SERVER_X = [480, 1120];
 var WALL_COLS = WALL_SERVER_X.map(function(wx) { return Math.round(wx / MAP_WIDTH * GRID_COLS); });
 
 function resizeSurvivalCanvas() {
@@ -476,3 +476,68 @@ G.socket.on('survivalEnd', function(data) {
     '</div>';
   }).join('');
 });
+
+// ─── 보상 선택 시스템 ───
+var rewardTimer = null;
+
+G.socket.on('rewardChoice', function(data) {
+  var rewards = data.rewards;
+  showRewardUI(rewards);
+});
+
+G.socket.on('rewardAutoSelected', function() {
+  hideRewardUI();
+  survivalLogAdd('⏰ 시간 초과! 보상 자동 선택됨');
+});
+
+function showRewardUI(rewards) {
+  var overlay = document.getElementById('rewardOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'rewardOverlay';
+    overlay.className = 'reward-overlay';
+    document.getElementById('survival-screen').appendChild(overlay);
+  }
+
+  var html = '<div class="reward-title">⭐ 웨이브 클리어! 보상을 선택하세요</div>';
+  html += '<div class="reward-timer" id="rewardTimerText">8</div>';
+  html += '<div class="reward-cards">';
+  rewards.forEach(function(r, idx) {
+    html += '<div class="reward-card" data-idx="' + idx + '">';
+    html += '<div class="reward-icon">' + r.icon + '</div>';
+    html += '<div class="reward-name">' + esc(r.name) + '</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+  overlay.innerHTML = html;
+  overlay.style.display = 'flex';
+
+  // 클릭 핸들러
+  overlay.querySelectorAll('.reward-card').forEach(function(card) {
+    card.addEventListener('click', function() {
+      var idx = parseInt(card.dataset.idx);
+      G.socket.emit('selectReward', { rewardIndex: idx });
+      survivalLogAdd('🎁 보상 선택: ' + rewards[idx].icon + ' ' + rewards[idx].name);
+      hideRewardUI();
+    });
+  });
+
+  // 타이머
+  var remaining = 8;
+  if (rewardTimer) clearInterval(rewardTimer);
+  rewardTimer = setInterval(function() {
+    remaining--;
+    var timerEl = document.getElementById('rewardTimerText');
+    if (timerEl) timerEl.textContent = remaining;
+    if (remaining <= 0) {
+      clearInterval(rewardTimer);
+      rewardTimer = null;
+    }
+  }, 1000);
+}
+
+function hideRewardUI() {
+  if (rewardTimer) { clearInterval(rewardTimer); rewardTimer = null; }
+  var overlay = document.getElementById('rewardOverlay');
+  if (overlay) overlay.style.display = 'none';
+}

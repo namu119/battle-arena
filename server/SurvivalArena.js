@@ -44,6 +44,8 @@ class SurvivalArena {
     this.bossSpawned = false;
     this.bossKiller = null;
     this._charWallSides = new Map();
+    this._lastMonsterCount = 0;
+    this.pendingRewards = null;
   }
 
   _assignZones(builds) {
@@ -70,16 +72,134 @@ class SurvivalArena {
     });
   }
 
+  /** 전체 실행 (테스트용, AI 전용) */
   run() {
     while (!this.finished && this.tick < MAX_SURVIVAL_TICKS) {
       this.processTick();
+      // 보상 시점이면 AI 자동선택
+      if (this.pendingRewards) {
+        this._autoSelectAllRewards();
+      }
     }
-
-    if (!this.finished) {
-      this._finishByHP();
-    }
-
+    if (!this.finished) this._finishByHP();
     return { log: this.log, results: this.results };
+  }
+
+  /** 특정 틱까지 실행 (인터랙티브 모드) */
+  runUntilTick(targetTick) {
+    const startLog = this.log.length;
+    while (!this.finished && this.tick < targetTick && this.tick < MAX_SURVIVAL_TICKS) {
+      this.processTick();
+      // 보상 시점 체크: 웨이브 클리어 직후
+      if (this._checkRewardPoint()) {
+        break; // 보상 선택 대기
+      }
+    }
+    if (!this.finished && this.tick >= MAX_SURVIVAL_TICKS) this._finishByHP();
+    return { newLog: this.log.slice(startLog), finished: this.finished, results: this.results };
+  }
+
+  /** 보상 시점 체크: 웨이브 몬스터 전멸 시 */
+  _checkRewardPoint() {
+    // 웨이브 스폰된 후 해당 웨이브 몬스터가 전멸하면 보상
+    const aliveMonsters = this.engine.characters.filter(c => c.isMonster && c.alive && !c.isBoss && !c.isGatekeeper);
+    const waveJustCleared = this._lastMonsterCount > 0 && aliveMonsters.length === 0;
+    this._lastMonsterCount = aliveMonsters.length;
+
+    if (waveJustCleared && !this.pendingRewards) {
+      this.pendingRewards = this._generateRewards();
+      this.metaEvents.push({ type: 'rewardChoice', rewards: this.pendingRewards });
+      return true;
+    }
+    return false;
+  }
+
+  /** 보상 3개 생성 */
+  _generateRewards() {
+    const options = [
+      // 공격 보상
+      { id: 'atk1', icon: '🗡️', name: 'ATK +4', effect: { ATK: 4 } },
+      { id: 'atk2', icon: '⚔️', name: 'ATK +2, SPD +2', effect: { ATK: 2, SPD: 2 } },
+      { id: 'crit', icon: '💥', name: '크리티컬 확률 +10%', effect: { critBonus: 0.1 } },
+      // 방어 보상
+      { id: 'def1', icon: '🛡️', name: 'DEF +4', effect: { DEF: 4 } },
+      { id: 'hp1', icon: '❤️', name: 'HP +80', effect: { maxHP: 80 } },
+      { id: 'def2', icon: '🏰', name: 'DEF +2, HP +40', effect: { DEF: 2, maxHP: 40 } },
+      // 스킬/유틸
+      { id: 'spd1', icon: '⚡', name: 'SPD +3', effect: { SPD: 3 } },
+      { id: 'int1', icon: '🔮', name: 'INT +4, 스킬뎀 증가', effect: { INT: 4 } },
+      { id: 'heal', icon: '💚', name: 'HP 50% 회복', effect: { healPercent: 0.5 } },
+      { id: 'gold', icon: '💰', name: '+150G', effect: { gold: 150 } },
+      { id: 'cool', icon: '🔄', name: '쿨다운 전체 초기화', effect: { resetCooldowns: true } },
+      { id: 'shield', icon: '🔷', name: '실드 +50', effect: { shield: 50 } },
+    ];
+    // 랜덤 3개 선택 (중복 없이)
+    const shuffled = options.sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, 3);
+  }
+
+  /** 보상 적용 (플레이어 ID + 선택 인덱스) */
+  applyReward(playerId, rewardIndex) {
+    if (!this.pendingRewards) return;
+    const reward = this.pendingRewards[rewardIndex] || this.pendingRewards[0];
+    const char = this.engine.characters.find(c => c.id === playerId);
+    if (!char || char.isMonster) return;
+    this._applyEffect(char, reward.effect);
+    this.metaEvents.push({ type: 'rewardApplied', playerId, playerName: char.name, reward: reward.name, icon: reward.icon });
+  }
+
+  /** AI 전체 자동선택 */
+  _autoSelectAllRewards() {
+    if (!this.pendingRewards) return;
+    for (const char of this.engine.characters) {
+      if (char.isMonster || !char.alive) continue;
+      // AI: 자기 빌드에 맞는 보상 선택
+      const bestIdx = this._aiBestReward(char);
+      this._applyEffect(char, this.pendingRewards[bestIdx].effect);
+    }
+    this.pendingRewards = null;
+  }
+
+  /** 보상 선택 완료 (인터랙티브 모드) */
+  clearRewards() {
+    this.pendingRewards = null;
+    this._lastMonsterCount = this.engine.characters.filter(c => c.isMonster && c.alive && !c.isBoss && !c.isGatekeeper).length;
+  }
+
+  /** AI 최적 보상 선택 */
+  _aiBestReward(char) {
+    const atk = char.stats?.ATK || 0;
+    const def = char.stats?.DEF || 0;
+    // 공격형 → ATK 보상, 방어형 → DEF/HP 보상
+    if (atk > def) return 0; // 첫번째 (보통 공격)
+    if (def > atk) return 1; // 두번째 (보통 방어)
+    return Math.floor(Math.random() * 3);
+  }
+
+  /** 효과 적용 */
+  _applyEffect(char, effect) {
+    if (effect.ATK) { char.stats.ATK += effect.ATK; char.baseStats.ATK += effect.ATK; }
+    if (effect.DEF) { char.stats.DEF += effect.DEF; char.baseStats.DEF += effect.DEF; }
+    if (effect.INT) { char.stats.INT += effect.INT; char.baseStats.INT += effect.INT; }
+    if (effect.SPD) { char.stats.SPD += effect.SPD; char.baseStats.SPD += effect.SPD; }
+    if (effect.maxHP) {
+      char.stats.maxHP += effect.maxHP;
+      char.baseStats.maxHP += effect.maxHP;
+      char.hp += effect.maxHP;
+    }
+    if (effect.healPercent) {
+      char.hp = Math.min(char.stats.maxHP, char.hp + Math.floor(char.stats.maxHP * effect.healPercent));
+    }
+    if (effect.gold) { char.gold = (char.gold || 0) + effect.gold; }
+    if (effect.shield) {
+      char.buffs.push({ type: 'shield', value: effect.shield, duration: 999 });
+    }
+    if (effect.resetCooldowns) {
+      for (const s of char.skills) s.currentCooldown = 0;
+    }
+    if (effect.critBonus) {
+      char._critBonus = (char._critBonus || 0) + effect.critBonus;
+    }
   }
 
   processTick() {
