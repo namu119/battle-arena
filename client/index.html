@@ -17,14 +17,20 @@
   <!-- 로비 -->
   <div id="lobby">
     <h1>Battle Arena</h1>
+    <h3 style="color:#7ec8e3">서바이벌 아레나</h3>
     <input id="playerName" placeholder="닉네임" maxlength="10" value="">
-    <div style="margin:15px auto;display:flex;flex-wrap:wrap;gap:8px;justify-content:center;width:100%;max-width:400px">
-      <button class="btn" onclick="createRoom()">방 만들기</button>
-      <button class="btn btn-secondary" onclick="refreshRooms()">방 목록</button>
-      <button class="btn" onclick="soloMode()" style="background:#0f3460;border:1px solid #7ec8e3">혼자 연습 (vs AI)</button>
-      <button class="btn" onclick="survivalMode()" style="background:#2d1b69;border:1px solid #e94560">서바이벌 아레나</button>
-    </div>
+    <button class="btn" onclick="quickStart()">빠른 시작</button>
     <div id="roomList"></div>
+    <button class="btn btn-secondary" onclick="createNewRoom()">+ 새 방 만들기</button>
+  </div>
+
+  <!-- 대기실 -->
+  <div id="room-screen">
+    <h2>대기실</h2>
+    <div id="roomSlots" class="room-slots">
+      <!-- 4 slot cards rendered by JS -->
+    </div>
+    <button class="btn" id="startGameBtn" onclick="startGame()" disabled>시작!</button>
   </div>
 
   <!-- 캐릭터 제작소 -->
@@ -71,13 +77,8 @@
       <div class="skill-select" id="skillSelect"></div>
     </div>
 
-    <div style="margin: 8px auto; width: 95%; max-width: 800px;">
-      <div class="player-list" id="playerList"></div>
-    </div>
     <div id="workshopCta">
-      <button class="btn" id="submitBtn" onclick="submitBuild()" disabled style="display:none;width:100%;font-size:1.1em;padding:14px;font-weight:bold">출전!</button>
-      <button class="btn" id="aiBtn" onclick="fightAI()" disabled style="display:none;width:100%;font-size:1.1em;padding:14px;background:#0f3460;border:1px solid #7ec8e3">AI와 전투</button>
-      <button class="btn" id="survivalBtn" onclick="startSurvival()" disabled style="display:none;width:100%;font-size:1.1em;padding:14px;background:#2d1b69;border:1px solid #e94560">서바이벌 시작</button>
+      <button class="btn" id="submitBtn" onclick="submitBuild()" disabled style="width:100%;font-size:1.1em;padding:14px;font-weight:bold">빌드 제출</button>
     </div>
   </div>
 
@@ -129,7 +130,7 @@
   <div id="result-screen">
     <h2>전투 결과</h2>
     <div id="resultCards"></div>
-    <button class="btn" onclick="backToWorkshop()" style="margin-top:20px">다시 출전</button>
+    <button class="btn" onclick="backToLobby()" style="margin-top:20px">로비로 돌아가기</button>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>

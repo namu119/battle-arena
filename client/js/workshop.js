@@ -168,8 +168,6 @@ function validate() {
     && selectedSkills.length === 3
     && cost <= INITIAL_GOLD;
   document.getElementById('submitBtn').disabled = !valid;
-  document.getElementById('aiBtn').disabled = !valid;
-  document.getElementById('survivalBtn').disabled = !valid;
 }
 
 function getTotalCost() {
@@ -190,21 +188,7 @@ function submitBuild() {
     if (!build) return;
     G.socket.emit('submitBuild', build);
     document.getElementById('submitBtn').disabled = true;
-    document.getElementById('submitBtn').textContent = '대기중...';
-  } catch (e) {
-    console.error('빌드 생성 실패', e);
-    alert('빌드 생성 실패: ' + e.message);
-  }
-}
-
-function fightAI() {
-  try {
-    var build = makeBuild();
-    if (!build) return;
-    build.playerName = G.myName;
-    G.socket.emit('fightAI', build);
-    document.getElementById('aiBtn').disabled = true;
-    document.getElementById('aiBtn').textContent = '매칭중...';
+    document.getElementById('submitBtn').textContent = '제출 완료! 대기중...';
   } catch (e) {
     console.error('빌드 생성 실패', e);
     alert('빌드 생성 실패: ' + e.message);

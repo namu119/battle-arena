@@ -249,28 +249,4 @@ G.socket.on('battleTick', function(data) {
   }
 });
 
-// ─── 결과 ───
-G.socket.on('battleEnd', function(data) {
-  G.isBattleActive = false;
-  if (G.animFrameId) {
-    cancelAnimationFrame(G.animFrameId);
-    G.animFrameId = null;
-  }
-  G.animations = [];
-  G.deathAnims.clear();
-  G.deadAnimated.clear();
-
-  showScreen('result-screen');
-  var el = document.getElementById('resultCards');
-  el.innerHTML = data.results.map(function(r) {
-    var rankClass = r.rank <= 3 ? 'rank-' + r.rank : '';
-    return '<div class="result-card">' +
-      '<div class="rank ' + rankClass + '">' + r.rank + '등</div>' +
-      '<div>' +
-        '<div style="font-weight:bold">' + esc(r.name) + ' (' + esc(r.className) + ')</div>' +
-        '<div style="color:#aaa">HP: ' + r.hpRemaining + '</div>' +
-        '<div class="reward-gold">+' + r.reward.gold + 'G</div>' +
-      '</div>' +
-    '</div>';
-  }).join('');
-});
+// ─── 결과 (PvP battle은 제거됨 - 서바이벌만 사용) ───

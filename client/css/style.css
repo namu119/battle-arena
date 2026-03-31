@@ -7,7 +7,7 @@ body {
 }
 
 /* 화면 컨테이너 */
-#lobby, #workshop, #battle-screen, #result-screen, #survival-screen {
+#lobby, #room-screen, #workshop, #battle-screen, #result-screen, #survival-screen {
   display: none;
   width: 100%;
   min-height: 100vh;
@@ -409,6 +409,19 @@ input {
   100% { opacity: 0; }
 }
 
+/* 대기실 슬롯 */
+.room-slots { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin: 15px; }
+.slot-card { background: #16213e; border: 2px solid #333; border-radius: 10px; padding: 15px 20px; min-width: 150px; text-align: center; cursor: pointer; transition: all 0.2s; }
+.slot-card.slot-player { border-color: #e94560; color: #fff; }
+.slot-card.slot-ai { border-color: #7ec8e3; color: #7ec8e3; }
+.slot-card.slot-empty { border-style: dashed; color: #666; }
+.slot-card.slot-empty:hover { border-color: #7ec8e3; color: #7ec8e3; }
+
+/* 방 목록 카드 */
+.room-list-card { display: flex; align-items: center; justify-content: space-between; background: #16213e; border: 1px solid #333; border-radius: 8px; padding: 10px 16px; margin: 6px 0; width: 100%; max-width: 400px; }
+.room-list-name { color: #fff; font-weight: bold; font-size: 0.95em; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-list-info { color: #7ec8e3; font-size: 0.9em; margin: 0 12px; }
+
 /* 결과 */
 .result-card {
   background: #16213e;
@@ -460,7 +473,7 @@ input {
   h1 { font-size: 1.4em; }
   h2 { font-size: 1.2em; }
 
-  #lobby, #workshop, #battle-screen, #result-screen, #survival-screen {
+  #lobby, #room-screen, #workshop, #battle-screen, #result-screen, #survival-screen {
     padding-top: 16px;
     padding-bottom: 16px;
   }
@@ -630,6 +643,14 @@ input {
   #lobby > div { flex-direction: column; align-items: center; gap: 8px; }
   #lobby .btn { width: 85%; max-width: 300px; }
   #lobby h1 { text-align: center; }
+
+  /* ── 대기실 모바일 ── */
+  #room-screen { padding: 16px 8px; }
+  .room-slots { gap: 6px; margin: 10px; }
+  .slot-card { min-width: 120px; padding: 10px 14px; font-size: 0.9em; }
+  .room-list-card { padding: 8px 12px; }
+  .room-list-name { font-size: 0.85em; }
+  .room-list-info { font-size: 0.8em; }
 
   /* ── 결과 화면 모바일 ── */
   #result-screen { padding: 12px 8px; align-items: center; }

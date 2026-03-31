@@ -4,9 +4,8 @@ const https = require('https');
 const fs = require('fs');
 const { Server } = require('socket.io');
 const path = require('path');
-const { BattleEngine, TICK_INTERVAL } = require('./BattleEngine');
-const { calculateRewards } = require('./Reward');
 const { SurvivalArena } = require('./SurvivalArena');
+const { TICK_INTERVAL } = require('./BattleEngine');
 
 const classes = require('../data/classes.json');
 const equipments = require('../data/equipments.json');
@@ -118,25 +117,58 @@ app.get('/api/data', (req, res) => {
 
 // ─── 방 관리 ───
 const rooms = new Map();
+let roomCounter = 0;
 
-function createRoom(id) {
+function createRoom(id, creatorSocketId, creatorName) {
   return {
     id,
-    players: new Map(), // socketId → { name, build }
-    state: 'waiting',   // waiting | building | battle | result
-    minPlayers: 2,
-    maxPlayers: 5,
+    slots: [
+      { type: 'player', socketId: creatorSocketId, name: creatorName, build: null },
+      { type: 'empty' },
+      { type: 'empty' },
+      { type: 'empty' },
+    ],
+    state: 'waiting', // waiting | building | playing
+    hostSocketId: creatorSocketId,
   };
+}
+
+function getRoomList() {
+  const list = [];
+  for (const [id, room] of rooms) {
+    if (room.state === 'waiting') {
+      const slotInfo = room.slots.map(s => ({ type: s.type, name: s.name || null }));
+      const playerCount = room.slots.filter(s => s.type !== 'empty').length;
+      const hostSlot = room.slots.find(s => s.socketId === room.hostSocketId);
+      list.push({ id, name: hostSlot ? hostSlot.name + '의 방' : id, slots: slotInfo, playerCount });
+    }
+  }
+  return list;
+}
+
+function getRoomSlotInfo(room) {
+  return room.slots.map((s, i) => ({
+    index: i,
+    type: s.type,
+    name: s.name || null,
+  }));
+}
+
+function broadcastRoomList() {
+  io.emit('roomList', getRoomList());
 }
 
 io.on('connection', (socket) => {
   console.log(`접속: ${socket.id}`);
-  let currentRoom = null;
-  let activeInterval = null; // battle/survival interval cleanup on disconnect
-  let currentTickLog = null; // for speed control
+  let currentRoomId = null;
+  let activeInterval = null;
+  let currentTickLog = null;
   let currentTickIndex = 0;
-  let currentTickMode = null; // 'battle' or 'survival'
+  let currentTickMode = null;
   let currentTickResults = null;
+
+  // 접속 시 방 목록 전송
+  socket.emit('roomList', getRoomList());
 
   // 배속 컨트롤
   socket.on('setSpeed', (speed) => {
@@ -147,121 +179,158 @@ io.on('connection', (socket) => {
       if (currentTickIndex >= currentTickLog.length) {
         clearInterval(activeInterval);
         activeInterval = null;
-        const endEvent = currentTickMode === 'survival' ? 'survivalEnd' : 'battleEnd';
-        socket.emit(endEvent, { results: currentTickResults });
+        socket.emit('survivalEnd', { results: currentTickResults });
         return;
       }
-      socket.emit(currentTickMode === 'survival' ? 'survivalTick' : 'battleTick', currentTickLog[currentTickIndex]);
+      socket.emit('survivalTick', currentTickLog[currentTickIndex]);
       currentTickIndex++;
     }, TICK_INTERVAL / speed);
   });
 
-  // 방 목록
+  // 방 목록 요청
   socket.on('getRooms', () => {
-    const list = [];
-    for (const [id, room] of rooms) {
-      if (room.state === 'waiting') {
-        list.push({ id, players: room.players.size, max: room.maxPlayers });
-      }
-    }
-    socket.emit('roomList', list);
+    socket.emit('roomList', getRoomList());
   });
 
-  // 방 생성
-  socket.on('createRoom', (playerName) => {
-    const roomId = `room_${Date.now()}`;
-    const room = createRoom(roomId);
-    room.players.set(socket.id, { name: playerName, build: null });
+  // 빠른 시작: 방 생성 + AI 3명 채우기 → 바로 워크샵
+  socket.on('quickStart', (playerName) => {
+    const roomId = `room_${++roomCounter}_${Date.now()}`;
+    const room = createRoom(roomId, socket.id, playerName || 'Player');
+    // AI 3명으로 빈 슬롯 채우기
+    for (let i = 1; i <= 3; i++) {
+      const aiBuild = generateAIBuild(i - 1);
+      room.slots[i] = { type: 'ai', name: aiBuild.playerName, build: aiBuild };
+    }
     rooms.set(roomId, room);
-    currentRoom = room;
+    currentRoomId = roomId;
     socket.join(roomId);
-    socket.emit('joinedRoom', { roomId, players: getPlayerList(room) });
+    // 빠른 시작은 바로 building 상태로
+    room.state = 'building';
+    socket.emit('joinedRoom', { roomId, slots: getRoomSlotInfo(room) });
+    socket.emit('goToWorkshop', { roomId });
+    broadcastRoomList();
+    console.log(`빠른시작: ${roomId} by ${playerName}`);
+  });
+
+  // 방 만들기: 1 플레이어 + 3 빈 슬롯
+  socket.on('createRoom', (playerName) => {
+    const roomId = `room_${++roomCounter}_${Date.now()}`;
+    const room = createRoom(roomId, socket.id, playerName || 'Player');
+    rooms.set(roomId, room);
+    currentRoomId = roomId;
+    socket.join(roomId);
+    socket.emit('joinedRoom', { roomId, slots: getRoomSlotInfo(room) });
+    broadcastRoomList();
     console.log(`방 생성: ${roomId} by ${playerName}`);
   });
 
   // 방 참가
   socket.on('joinRoom', ({ roomId, playerName }) => {
     const room = rooms.get(roomId);
-    if (!room || room.state !== 'waiting' || room.players.size >= room.maxPlayers) {
+    if (!room || room.state !== 'waiting') {
       socket.emit('error', '참가할 수 없는 방입니다');
       return;
     }
-    room.players.set(socket.id, { name: playerName, build: null });
-    currentRoom = room;
+    const emptyIdx = room.slots.findIndex(s => s.type === 'empty');
+    if (emptyIdx < 0) {
+      socket.emit('error', '방이 꽉 찼습니다');
+      return;
+    }
+    room.slots[emptyIdx] = { type: 'player', socketId: socket.id, name: playerName || 'Player', build: null };
+    currentRoomId = roomId;
     socket.join(roomId);
-    io.to(roomId).emit('playerJoined', { players: getPlayerList(room) });
-    console.log(`${playerName} → ${roomId} (${room.players.size}명)`);
+    io.to(roomId).emit('roomUpdate', { slots: getRoomSlotInfo(room) });
+    broadcastRoomList();
+    console.log(`${playerName} → ${roomId}`);
+  });
+
+  // AI 추가
+  socket.on('addAI', (roomId) => {
+    const room = rooms.get(roomId);
+    if (!room || room.state !== 'waiting') return;
+    if (room.hostSocketId !== socket.id) return; // 호스트만 가능
+    const emptyIdx = room.slots.findIndex(s => s.type === 'empty');
+    if (emptyIdx < 0) return;
+    const aiBuild = generateAIBuild(emptyIdx);
+    room.slots[emptyIdx] = { type: 'ai', name: aiBuild.playerName, build: aiBuild };
+    io.to(roomId).emit('roomUpdate', { slots: getRoomSlotInfo(room) });
+    broadcastRoomList();
+  });
+
+  // 게임 시작 (호스트가 클릭)
+  socket.on('startGame', () => {
+    const room = rooms.get(currentRoomId);
+    if (!room || room.state !== 'waiting') return;
+    if (room.hostSocketId !== socket.id) return;
+    // 4 슬롯 모두 채워져야 함
+    const allFilled = room.slots.every(s => s.type !== 'empty');
+    if (!allFilled) {
+      socket.emit('error', '모든 슬롯을 채워주세요');
+      return;
+    }
+    room.state = 'building';
+    io.to(room.id).emit('goToWorkshop', { roomId: room.id });
+    broadcastRoomList();
+    console.log(`게임 시작 → 워크샵: ${room.id}`);
   });
 
   // 빌드 제출
   socket.on('submitBuild', (build) => {
-    if (!currentRoom) return;
-    const player = currentRoom.players.get(socket.id);
-    if (!player) return;
-    player.build = build;
-    player.build.playerName = player.name;
+    const room = rooms.get(currentRoomId);
+    if (!room || room.state !== 'building') return;
+    // 해당 플레이어 슬롯 찾기
+    const slot = room.slots.find(s => s.type === 'player' && s.socketId === socket.id);
+    if (!slot) return;
+    slot.build = build;
+    slot.build.playerName = slot.name;
 
-    io.to(currentRoom.id).emit('playerReady', {
-      players: getPlayerList(currentRoom),
-    });
+    io.to(room.id).emit('roomUpdate', { slots: getRoomSlotInfo(room) });
 
-    // 모두 빌드 제출 완료 + 최소 인원 충족
-    const allReady = [...currentRoom.players.values()].every(p => p.build);
-    if (allReady && currentRoom.players.size >= currentRoom.minPlayers) {
-      startBattle(currentRoom);
+    // 모든 빌드 제출 완료 확인 (AI는 이미 빌드 있음)
+    const allReady = room.slots.every(s => s.build !== null);
+    if (allReady) {
+      startSurvivalFromRoom(room);
     }
   });
 
-  // AI와 전투 (솔로)
-  socket.on('fightAI', (build) => {
-    try {
-      const playerName = build.playerName || 'Player';
-      build.playerName = playerName;
-
-      // AI 3명 생성
-      const aiBots = [generateAIBuild(0), generateAIBuild(1), generateAIBuild(2)];
-      const allBuilds = [build, ...aiBots];
-
-      console.log(`AI전투 시작: ${playerName} vs ${aiBots.map(b => b.playerName + '(' + b.className + ')').join(', ')}`);
-
-      const engine = new BattleEngine(allBuilds);
-      const { log, results } = engine.run();
-      const rewarded = calculateRewards(results);
-
-      currentTickLog = log;
-      currentTickIndex = 0;
-      currentTickMode = 'battle';
-      currentTickResults = rewarded;
-
-      socket.emit('battleStart', { totalTicks: log.length });
-
-      activeInterval = setInterval(() => {
-        if (currentTickIndex >= currentTickLog.length) {
-          clearInterval(activeInterval);
-          activeInterval = null;
-          socket.emit('battleEnd', { results: currentTickResults });
-          return;
+  // 연결 해제
+  socket.on('disconnect', () => {
+    if (activeInterval) {
+      clearInterval(activeInterval);
+      activeInterval = null;
+    }
+    if (currentRoomId) {
+      const room = rooms.get(currentRoomId);
+      if (room) {
+        // 플레이어 슬롯 비우기
+        const slotIdx = room.slots.findIndex(s => s.type === 'player' && s.socketId === socket.id);
+        if (slotIdx >= 0) {
+          room.slots[slotIdx] = { type: 'empty' };
         }
-        socket.emit('battleTick', currentTickLog[currentTickIndex]);
-        currentTickIndex++;
-      }, TICK_INTERVAL);
-    } catch (e) {
-      console.error('AI전투 에러:', e);
-      socket.emit('error', '전투 시작 실패: ' + e.message);
+        // 남은 플레이어 확인
+        const remainingPlayers = room.slots.filter(s => s.type === 'player');
+        if (remainingPlayers.length === 0) {
+          rooms.delete(currentRoomId);
+        } else {
+          // 호스트가 나갔으면 다른 플레이어를 호스트로
+          if (room.hostSocketId === socket.id) {
+            room.hostSocketId = remainingPlayers[0].socketId;
+          }
+          io.to(room.id).emit('roomUpdate', { slots: getRoomSlotInfo(room) });
+        }
+        broadcastRoomList();
+      }
     }
+    console.log(`퇴장: ${socket.id}`);
   });
 
-  // Survival Arena 모드 (솔로 vs AI 3명)
-  socket.on('startSurvival', (build) => {
+  // ─── 서바이벌 실행 (방에서 트리거) ───
+  function startSurvivalFromRoom(room) {
     try {
-      const playerName = build.playerName || 'Player';
-      build.playerName = playerName;
+      room.state = 'playing';
+      const allBuilds = room.slots.map(s => s.build);
 
-      // AI 3명 생성
-      const aiBots = [generateAIBuild(0), generateAIBuild(1), generateAIBuild(2)];
-      const allBuilds = [build, ...aiBots];
-
-      console.log(`서바이벌 시작: ${playerName} vs ${aiBots.map(b => b.playerName + '(' + b.className + ')').join(', ')}`);
+      console.log(`서바이벌 시작: ${allBuilds.map(b => b.playerName + '(' + b.className + ')').join(', ')}`);
 
       const arena = new SurvivalArena(allBuilds);
       const { log, results } = arena.run();
@@ -271,83 +340,56 @@ io.on('connection', (socket) => {
       currentTickMode = 'survival';
       currentTickResults = results;
 
-      socket.emit('survivalStart', {
-        totalTicks: log.length,
-        zones: [0, 1, 2, 3],
-        playerZone: 0,
-      });
+      // 방의 모든 플레이어 소켓에 전송
+      const playerSockets = room.slots
+        .filter(s => s.type === 'player' && s.socketId)
+        .map(s => s.socketId);
+
+      for (const sid of playerSockets) {
+        const psock = io.sockets.sockets.get(sid);
+        if (psock) {
+          psock.emit('survivalStart', {
+            totalTicks: log.length,
+            zones: [0, 1, 2, 3],
+            playerZone: 0,
+          });
+        }
+      }
 
       activeInterval = setInterval(() => {
         if (currentTickIndex >= currentTickLog.length) {
           clearInterval(activeInterval);
           activeInterval = null;
-          socket.emit('survivalEnd', { results: currentTickResults });
+          for (const sid of playerSockets) {
+            const psock = io.sockets.sockets.get(sid);
+            if (psock) psock.emit('survivalEnd', { results: currentTickResults });
+          }
+          // 방 정리
+          room.state = 'waiting';
+          for (const s of room.slots) {
+            if (s.type === 'player') s.build = null;
+          }
+          broadcastRoomList();
           return;
         }
-        socket.emit('survivalTick', currentTickLog[currentTickIndex]);
+        for (const sid of playerSockets) {
+          const psock = io.sockets.sockets.get(sid);
+          if (psock) psock.emit('survivalTick', currentTickLog[currentTickIndex]);
+        }
         currentTickIndex++;
       }, TICK_INTERVAL);
     } catch (e) {
       console.error('서바이벌 에러:', e);
-      socket.emit('error', '서바이벌 시작 실패: ' + e.message);
-    }
-  });
-
-  // 연결 해제
-  socket.on('disconnect', () => {
-    // 진행 중인 전투/서바이벌 interval 정리
-    if (activeInterval) {
-      clearInterval(activeInterval);
-      activeInterval = null;
-    }
-    if (currentRoom) {
-      currentRoom.players.delete(socket.id);
-      if (currentRoom.players.size === 0) {
-        rooms.delete(currentRoom.id);
-      } else {
-        io.to(currentRoom.id).emit('playerLeft', { players: getPlayerList(currentRoom) });
+      const playerSockets = room.slots
+        .filter(s => s.type === 'player' && s.socketId)
+        .map(s => s.socketId);
+      for (const sid of playerSockets) {
+        const psock = io.sockets.sockets.get(sid);
+        if (psock) psock.emit('error', '서바이벌 시작 실패: ' + e.message);
       }
     }
-    console.log(`퇴장: ${socket.id}`);
-  });
-});
-
-function getPlayerList(room) {
-  const list = [];
-  for (const [id, p] of room.players) {
-    list.push({ id, name: p.name, ready: !!p.build });
   }
-  return list;
-}
-
-function startBattle(room) {
-  room.state = 'battle';
-  const builds = [...room.players.values()].map(p => p.build);
-
-  const engine = new BattleEngine(builds);
-  const { log, results } = engine.run();
-  const rewarded = calculateRewards(results);
-
-  io.to(room.id).emit('battleStart', { totalTicks: log.length });
-
-  // 틱별 재생 전송
-  let tickIndex = 0;
-  const interval = setInterval(() => {
-    if (tickIndex >= log.length) {
-      clearInterval(interval);
-      io.to(room.id).emit('battleEnd', { results: rewarded });
-
-      // 방 리셋
-      room.state = 'waiting';
-      for (const p of room.players.values()) {
-        p.build = null;
-      }
-      return;
-    }
-    io.to(room.id).emit('battleTick', log[tickIndex]);
-    tickIndex++;
-  }, TICK_INTERVAL);
-}
+});
 
 const PORT = process.env.PORT || 3456;
 const HTTPS_PORT = process.env.HTTPS_PORT || 3457;
