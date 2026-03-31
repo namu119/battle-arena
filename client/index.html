@@ -1591,53 +1591,76 @@
     }
 
     function drawSurvivalField(W, H) {
-      sCtx.fillStyle = '#0a0a1e';
+      // 배경
+      sCtx.fillStyle = '#0f3460';
       sCtx.fillRect(0, 0, W, H);
 
-      // Draw zone quadrants
-      const zoneRects = [
-        { x:0, y:0, w:W/2, h:H/2 },
-        { x:W/2, y:0, w:W/2, h:H/2 },
-        { x:0, y:H/2, w:W/2, h:H/2 },
-        { x:W/2, y:H/2, w:W/2, h:H/2 },
-      ];
-      for (let i = 0; i < 4; i++) {
-        const r = zoneRects[i];
-        const active = survivalActiveZones.includes(i);
-        sCtx.fillStyle = active ? '#0f2847' : '#080818';
-        sCtx.fillRect(r.x+1, r.y+1, r.w-2, r.h-2);
+      // 쿼터뷰 다이아몬드 필드 (PvP와 동일)
+      const { cx, cy, dw, dh } = getSurvivalDiamond(W, H);
 
-        // Zone border
-        sCtx.strokeStyle = active ? '#1a3a5c' : '#0a0a15';
-        sCtx.lineWidth = 1;
-        sCtx.strokeRect(r.x, r.y, r.w, r.h);
+      sCtx.fillStyle = '#0f2847';
+      sCtx.beginPath();
+      sCtx.moveTo(cx, cy - dh);
+      sCtx.lineTo(cx + dw, cy);
+      sCtx.lineTo(cx, cy + dh);
+      sCtx.lineTo(cx - dw, cy);
+      sCtx.closePath();
+      sCtx.fill();
 
-        // Zone label
-        sCtx.fillStyle = active ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.05)';
-        sCtx.font = `bold ${Math.round(W*0.04)}px sans-serif`;
-        sCtx.textAlign = 'center';
-        sCtx.fillText(ZONE_LABELS[i], r.x + r.w/2, r.y + r.h/2 + W*0.015);
+      // 그리드 라인
+      sCtx.strokeStyle = '#1a3a5c';
+      sCtx.lineWidth = 1;
+      const gridCount = 6;
+      for (let i = 1; i < gridCount; i++) {
+        const t = i / gridCount;
+        sCtx.beginPath();
+        sCtx.moveTo(cx + (-dw)*(1-t), cy + (-dh)*t);
+        sCtx.lineTo(cx + dw*t, cy + dh*(1-t));
+        sCtx.stroke();
+        sCtx.beginPath();
+        sCtx.moveTo(cx + dw*(1-t), cy + (-dh)*t);
+        sCtx.lineTo(cx + (-dw)*t, cy + dh*(1-t));
+        sCtx.stroke();
       }
 
-      // Phase indicator line
-      if (survivalPhase >= 2) {
-        // Horizontal merge line removed (zones 0+1, 2+3)
-        sCtx.strokeStyle = '#e94560';
+      // 존 경계선 (Phase에 따라)
+      if (survivalPhase < 3) {
+        sCtx.strokeStyle = 'rgba(233,69,96,0.4)';
         sCtx.lineWidth = 2;
-        sCtx.setLineDash([4,4]);
-        if (survivalPhase === 2) {
+        sCtx.setLineDash([6,4]);
+        // 수직 중앙선 (4존→2존 경계)
+        sCtx.beginPath();
+        sCtx.moveTo(cx, cy - dh);
+        sCtx.lineTo(cx, cy + dh);
+        sCtx.stroke();
+        if (survivalPhase < 2) {
+          // 추가 존 경계선 (4존)
           sCtx.beginPath();
-          sCtx.moveTo(0, H/2); sCtx.lineTo(W, H/2);
+          sCtx.moveTo(cx - dw*0.5, cy - dh*0.5);
+          sCtx.lineTo(cx + dw*0.5, cy + dh*0.5);
+          sCtx.stroke();
+          sCtx.beginPath();
+          sCtx.moveTo(cx + dw*0.5, cy - dh*0.5);
+          sCtx.lineTo(cx - dw*0.5, cy + dh*0.5);
           sCtx.stroke();
         }
         sCtx.setLineDash([]);
       }
     }
 
-    function serverToSurvivalView(serverX, charIdx, totalChars, W, H) {
-      const qvX = (serverX / 800) * W;
-      const spread = totalChars > 1 ? (charIdx / (totalChars - 1)) : 0.5;
-      const qvY = H * 0.15 + spread * H * 0.7;
+    function getSurvivalDiamond(W, H) {
+      return { cx: W/2, cy: H*0.55, dw: W*0.45, dh: H*0.38 };
+    }
+
+    function serverToSurvivalQV(serverX, charIdx, totalChars, W, H) {
+      const { cx, cy, dw, dh } = getSurvivalDiamond(W, H);
+      // Normalize X from server coords
+      const normX = (serverX / 800) * 2 - 1;
+      // Derive stable Y from character index
+      const normY = totalChars > 1 ? ((charIdx / (totalChars - 1)) * 2 - 1) * 0.6 : 0;
+      // Isometric projection
+      const qvX = cx + (normX - normY) * dw * 0.5;
+      const qvY = cy + (normX + normY) * dh * 0.5;
       return { qvX, qvY };
     }
 
@@ -1655,9 +1678,9 @@
       const chars = survivalChars.filter(c => c.alive || survivalDeathAnims.has(c.id));
       const totalChars = chars.length;
 
-      // Sort by y for painter's algorithm
+      // Sort by y for painter's algorithm (isometric)
       const toDraw = chars.map((c, idx) => {
-        const { qvX, qvY } = serverToSurvivalView(c.x, idx, totalChars, W, H);
+        const { qvX, qvY } = serverToSurvivalQV(c.x, idx, totalChars, W, H);
         return { char: c, qvX, qvY };
       }).sort((a, b) => a.qvY - b.qvY);
 
@@ -1826,17 +1849,21 @@
       const events = data.events || [];
       for (const evt of events) {
         if (evt.type === 'damage' && evt.amount > 0) {
-          const target = survivalChars.find(c => c.id === evt.to);
-          if (target) {
-            const { qvX, qvY } = serverToSurvivalView(target.x, 0, 1, survivalCanvas.width, survivalCanvas.height);
-            survivalAnimations.push({ type:'damage', x:qvX, y:qvY-15, startY:qvY-15, amount:evt.amount, isSkill:!!evt.skill, born:performance.now(), duration:1000 });
+          const aliveChars = survivalChars.filter(c => c.alive || survivalDeathAnims.has(c.id));
+          const targetIdx = aliveChars.findIndex(c => c.id === evt.to);
+          const target = aliveChars[targetIdx];
+          if (target && targetIdx >= 0) {
+            const { qvX, qvY } = serverToSurvivalQV(target.x, targetIdx, aliveChars.length, survivalCanvas.width, survivalCanvas.height);
+            survivalAnimations.push({ type:'damage', x:qvX, y:qvY-15, startY:qvY-15, amount:evt.amount, isSkill:!!evt.skill, isCrit:!!evt.crit, born:performance.now(), duration:evt.crit?1200:1000 });
           }
         }
         if (evt.type === 'death' && !survivalDeadAnimated.has(evt.target)) {
           survivalDeadAnimated.add(evt.target);
-          const c = survivalChars.find(ch => ch.id === evt.target);
-          if (c) {
-            const { qvX, qvY } = serverToSurvivalView(c.x, 0, 1, survivalCanvas.width, survivalCanvas.height);
+          const aliveChars = survivalChars.filter(c => c.alive || survivalDeathAnims.has(c.id));
+          const cIdx = aliveChars.findIndex(ch => ch.id === evt.target);
+          const c = aliveChars[cIdx];
+          if (c && cIdx >= 0) {
+            const { qvX, qvY } = serverToSurvivalQV(c.x, cIdx, aliveChars.length, survivalCanvas.width, survivalCanvas.height);
             survivalDeathAnims.set(evt.target, { born:performance.now(), duration:800 });
             if (!c.isMonster) survivalNotify(`${c.name} 사망!`, '#e94560');
           }
