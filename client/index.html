@@ -1892,6 +1892,15 @@
         if (evt.type === 'bossKill') {
           survivalNotify(`👑 ${evt.killerName}이(가) 보스를 처치! 승리!`, '#ffd700');
         }
+        if (evt.type === 'respawnQueued') {
+          survivalNotify(`💀 ${evt.playerName} 사망! ${evt.respawnIn}초 후 부활 (남은 목숨: ${evt.livesRemaining})`, '#ff8800');
+        }
+        if (evt.type === 'respawn') {
+          survivalNotify(`✨ ${evt.playerName} 부활! (남은 목숨: ${evt.livesRemaining})`, '#2ecc71');
+        }
+        if (evt.type === 'wallBreak') {
+          survivalNotify(`🧱 ${evt.label} 붕괴! 새로운 영역 개방!`, '#e94560');
+        }
       }
     });
 
@@ -1914,7 +1923,7 @@
           <div>
             <div style="font-weight:bold">${esc(r.name)} (${esc(r.className)})</div>
             ${bossTag}
-            <div style="color:#aaa">HP: ${r.hpRemaining} | 킬: ${r.monstersKilled || 0}마리</div>
+            <div style="color:#aaa">HP: ${r.hpRemaining} | 킬: ${r.monstersKilled || 0}마리 | 목숨: ${r.livesRemaining != null ? r.livesRemaining : '?'}</div>
             <div style="color:#f0a500">강화 Lv${enhTotal} (${enh.helmet||0}/${enh.armor||0}/${enh.weapon||0}/${enh.boots||0})</div>
             <div style="color:#f0a500">+${r.gold || 0}G</div>
           </div>

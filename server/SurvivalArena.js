@@ -15,6 +15,10 @@ const ZONE_MERGES = [
 
 class SurvivalArena {
   constructor(builds) {
+    // Init respawn BEFORE _assignZones (which uses it)
+    this.respawnLives = new Map();
+    this.respawnQueue = [];
+
     this.engine = new BattleEngine(this._assignZones(builds), {
       maxTicks: MAX_SURVIVAL_TICKS,
       finishCondition: 'external',
@@ -31,8 +35,7 @@ class SurvivalArena {
     this.bossSpawned = false;
     this.bossKiller = null; // player who got last hit on boss
     this.walls = (require('../data/drops.json').walls || []).map(w => ({ ...w, active: true }));
-    // Track which side of each wall each character started on
-    this._charWallSides = new Map(); // charId -> { wallIdx: 'left'|'right' }
+    this._charWallSides = new Map();
   }
 
   _assignZones(builds) {
@@ -44,13 +47,18 @@ class SurvivalArena {
       { x: 1520, zoneId: 3 },   // zone 3: far right
     ];
 
-    return builds.map((build, i) => ({
-      ...build,
-      x: zonePositions[i].x,
-      y: ARENA_HEIGHT / 2,
-      zoneId: zonePositions[i].zoneId,
-      team: i, // each player is their own team (FFA)
-    }));
+    return builds.map((build, i) => {
+      this.respawnLives.set(`p${i}`, 3); // 3회 부활
+      return {
+        ...build,
+        x: zonePositions[i].x,
+        y: ARENA_HEIGHT / 2,
+        zoneId: zonePositions[i].zoneId,
+        team: i,
+        spawnX: zonePositions[i].x, // 리스폰 위치 기억
+        livesRemaining: 3,
+      };
+    });
   }
 
   run() {
@@ -81,8 +89,9 @@ class SurvivalArena {
     // 2. Advance battle engine
     this.engine.processTick();
 
-    // 3. Process drops from monster deaths + player kills
+    // 3. Process drops + respawn queue
     this._processDrops();
+    this._processRespawns();
 
     // 4. Gold auto-enhance check (with cooldown: 50 ticks = 10s)
     for (const char of this.engine.characters) {
@@ -111,9 +120,13 @@ class SurvivalArena {
       this._finishByBossKill();
       return;
     }
-    // B) Only 1 player alive
+    // B) Only 1 player alive AND no pending respawns
     const alivePlayers = this.engine.characters.filter(c => c.alive && !c.isMonster);
-    if (alivePlayers.length <= 1) {
+    const pendingRespawns = this.respawnQueue.length;
+    const playersWithLives = this.engine.characters.filter(
+      c => !c.isMonster && (c.alive || (this.respawnLives.get(c.id) || 0) > 0 || this.respawnQueue.some(r => r.charId === c.id))
+    );
+    if (playersWithLives.length <= 1 && pendingRespawns === 0) {
       this._finishBattle();
     }
 
@@ -235,6 +248,61 @@ class SurvivalArena {
     return ZONE_BOUNDS[zoneId] || { minX: 0, maxX: ARENA_WIDTH };
   }
 
+  _processRespawns() {
+    // Queue player deaths for respawn
+    const events = this.engine.tickEvents || [];
+    for (const evt of events) {
+      if (evt.type === 'death') {
+        const deadChar = this.engine.characters.find(c => c.id === evt.target);
+        if (deadChar && !deadChar.isMonster) {
+          const lives = this.respawnLives.get(deadChar.id) || 0;
+          if (lives > 0) {
+            this.respawnLives.set(deadChar.id, lives - 1);
+            this.respawnQueue.push({
+              charId: deadChar.id,
+              respawnAtTick: this.tick + 25, // 5초 후 부활
+              spawnX: deadChar.spawnX || deadChar.x,
+            });
+            deadChar.livesRemaining = lives - 1;
+            this.metaEvents.push({
+              type: 'respawnQueued',
+              playerId: deadChar.id,
+              playerName: deadChar.name,
+              livesRemaining: lives - 1,
+              respawnIn: 5,
+            });
+          }
+        }
+      }
+    }
+
+    // Process respawn queue
+    for (let i = this.respawnQueue.length - 1; i >= 0; i--) {
+      const rsp = this.respawnQueue[i];
+      if (this.tick >= rsp.respawnAtTick) {
+        const char = this.engine.characters.find(c => c.id === rsp.charId);
+        if (char) {
+          // Revive with 50% HP
+          char.alive = true;
+          char.hp = Math.floor(char.stats.maxHP * 0.5);
+          char.x = rsp.spawnX;
+          char.y = ARENA_HEIGHT / 2;
+          char.buffs = [];
+          char.killedBy = null;
+          // Reset skill cooldowns
+          for (const s of char.skills) s.currentCooldown = 0;
+          this.metaEvents.push({
+            type: 'respawn',
+            playerId: char.id,
+            playerName: char.name,
+            livesRemaining: char.livesRemaining,
+          });
+        }
+        this.respawnQueue.splice(i, 1);
+      }
+    }
+  }
+
   _enforceWalls() {
     // Check if gatekeepers at each wall are dead → deactivate wall
     for (let wi = 0; wi < this.walls.length; wi++) {
@@ -339,6 +407,7 @@ class SurvivalArena {
       gold: c.gold || 0,
       enhancementLevels: c.enhancementLevels || {},
       monstersKilled: this.engine.characters.filter(m => m.isMonster && !m.alive && m.killedBy === c.id).length,
+      livesRemaining: this.respawnLives.get(c.id) || 0,
       bossKiller: c.id === this.bossKiller,
     }));
   }
@@ -360,6 +429,7 @@ class SurvivalArena {
       gold: c.gold || 0,
       enhancementLevels: c.enhancementLevels || {},
       monstersKilled: this.engine.characters.filter(m => m.isMonster && !m.alive && m.killedBy === c.id).length,
+      livesRemaining: this.respawnLives.get(c.id) || 0,
     }));
   }
 
@@ -381,6 +451,7 @@ class SurvivalArena {
       gold: c.gold || 0,
       enhancementLevels: c.enhancementLevels || {},
       monstersKilled: this.engine.characters.filter(m => m.isMonster && !m.alive && m.killedBy === c.id).length,
+      livesRemaining: this.respawnLives.get(c.id) || 0,
     }));
   }
 }
