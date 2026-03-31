@@ -97,14 +97,17 @@ function startWizardStep() {
     renderStatRadar();
     startTimer(5);
   } else if (wizardStep === 2) {
-    // STEP 3: 스킬 (자동 결정, 바로 출전)
-    content.innerHTML = renderSkillCards();
+    // STEP 3: 스킬 선택 (4개 중 3개)
+    allSkillCandidates = getSkillCandidates();
+    selectedSkills = [];
+    content.innerHTML = renderSkillSelection();
     actions.style.display = 'none';
     radarSec.style.display = 'block';
     ctaDiv.style.display = '';
+    document.getElementById('submitBtn').disabled = true;
     renderStatRadar();
     if (wizardTimerId) { clearInterval(wizardTimerId); wizardTimerId = null; }
-    document.getElementById('wizardTimer').textContent = '';
+    document.getElementById('wizardTimer').textContent = '스킬 3개를 선택하세요';
   }
 }
 
@@ -202,14 +205,51 @@ function renderEquipCards() {
   return html;
 }
 
-function renderSkillCards() {
-  var html = '<div style="text-align:center;color:#888;font-size:1.1em;margin-bottom:8px">STEP 3/3 — 스킬 확정</div>';
+var allSkillCandidates = [];
+
+function getSkillCandidates() {
+  var candidates = [];
+  for (var slot in equip) {
+    if (!equip[slot]) continue;
+    var cat = G.equipData[slotCategory[slot]];
+    if (cat && cat[equip[slot]]) {
+      var skill = cat[equip[slot]].skill;
+      candidates.push({ name: skill.name, type: skill.type, slot: slot, description: skill.description || '' });
+    }
+  }
+  return candidates;
+}
+
+function renderSkillSelection() {
+  var html = '<div style="text-align:center;color:#888;font-size:1.1em;margin-bottom:8px">STEP 3/3 — 스킬 선택 (3개)</div>';
   html += '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">';
-  for (var i = 0; i < selectedSkills.length; i++) {
-    html += '<div class="skill-chip selected">' + selectedSkills[i] + '</div>';
+  for (var i = 0; i < allSkillCandidates.length; i++) {
+    var sk = allSkillCandidates[i];
+    var isSelected = selectedSkills.indexOf(sk.name) >= 0;
+    var typeIcon = sk.type === 'attack' ? '⚔️' : sk.type === 'defense' ? '🛡️' : sk.type === 'buff' ? '✨' : '🔄';
+    html += '<div class="skill-chip ' + (isSelected ? 'selected' : '') + '" data-skill="' + sk.name + '" onclick="toggleSkillSelect(\'' + sk.name + '\')" style="cursor:pointer;min-width:100px;text-align:center">' +
+      '<div>' + typeIcon + ' ' + sk.name + '</div>' +
+      '<div style="font-size:0.7em;color:#aaa">' + SLOT_NAMES[sk.slot] + ' · ' + sk.description + '</div>' +
+    '</div>';
   }
   html += '</div>';
+  html += '<div style="text-align:center;margin-top:6px;color:#7ec8e3;font-size:0.9em">선택: ' + selectedSkills.length + '/3</div>';
   return html;
+}
+
+function toggleSkillSelect(skillName) {
+  var idx = selectedSkills.indexOf(skillName);
+  if (idx >= 0) {
+    selectedSkills.splice(idx, 1);
+  } else if (selectedSkills.length < 3) {
+    selectedSkills.push(skillName);
+  }
+  // Re-render skill chips
+  var content = document.getElementById('wizardContent');
+  if (content) content.innerHTML = renderSkillSelection();
+  // Enable submit when 3 selected
+  var btn = document.getElementById('submitBtn');
+  if (btn) btn.disabled = selectedSkills.length !== 3;
 }
 
 // ─── 골드 계산 ───
