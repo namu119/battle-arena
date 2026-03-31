@@ -153,6 +153,7 @@
       height: auto;
       aspect-ratio: 2 / 1;
       display: block;
+      touch-action: none;
     }
     .hp-bars {
       display: flex;
@@ -202,6 +203,7 @@
       height: auto;
       aspect-ratio: 2 / 1;
       display: block;
+      touch-action: none;
     }
     .survival-notify-item {
       background: rgba(15,52,96,0.9);
@@ -261,6 +263,8 @@
       .item-card { min-width: 120px; }
       .result-card { min-width: 240px; padding: 12px 20px; }
       .shop-section { width: 97%; }
+      #survival-screen { padding: 12px; }
+      #survivalHud { gap: 10px !important; }
     }
 
     /* ── 모바일 (max-width: 600px) ── */
@@ -268,9 +272,9 @@
       h1 { font-size: 1.4em; }
       h2 { font-size: 1.2em; }
 
-      #lobby, #workshop, #battle-screen, #result-screen {
-        padding-top: 24px;
-        padding-bottom: 24px;
+      #lobby, #workshop, #battle-screen, #result-screen, #survival-screen {
+        padding-top: 16px;
+        padding-bottom: 16px;
       }
       #workshop { padding: 12px; padding-top: 20px; }
 
@@ -316,6 +320,60 @@
       .skill-chip { font-size: 0.85em; padding: 5px 12px; }
 
       .player-list { min-width: 0; width: 100%; }
+
+      /* 서바이벌 모바일 */
+      #survival-screen { padding: 8px; padding-top: 12px; }
+
+      #survivalHud {
+        gap: 8px !important;
+        margin: 6px !important;
+        font-size: 0.85em;
+      }
+      #survivalHud > div { font-size: 0.9em !important; }
+      #survivalHud > button { padding: 4px 10px !important; font-size: 12px !important; min-height: 36px !important; }
+
+      #survival-canvas {
+        border-width: 1px;
+        border-radius: 4px;
+      }
+
+      #survivalNotify {
+        top: 8px !important;
+        right: 8px !important;
+        left: 8px;
+        max-width: none;
+      }
+      .survival-notify-item {
+        font-size: 0.75em;
+        padding: 4px 8px;
+      }
+
+      /* 배속 버튼 모바일 */
+      #speedBtn { padding: 4px 10px !important; font-size: 12px !important; min-height: 36px !important; }
+
+      /* 전투 화면 모바일 */
+      #battle-screen { padding: 8px; padding-top: 12px; }
+      #battle-screen > div:first-child { gap: 8px !important; }
+      #battle-screen > div:first-child h2 { font-size: 1.1em; }
+
+      /* 로비 버튼 모바일 스택 */
+      #lobby > div { flex-direction: column; align-items: center; }
+      #lobby .btn { width: 80%; max-width: 280px; }
+    }
+
+    /* ── 초소형 모바일 (max-width: 380px) ── */
+    @media (max-width: 380px) {
+      h1 { font-size: 1.2em; }
+      h2 { font-size: 1em; }
+      .btn { padding: 8px 12px; font-size: 14px; }
+      .item-card { padding: 8px; }
+      .item-name { font-size: 0.85em; }
+      .shop-section { padding: 10px; }
+      #survivalHud { gap: 4px !important; }
+      #survivalHud > div { font-size: 0.8em !important; }
+      .hp-bar-container { width: 95%; }
+      .char-name { font-size: 0.8em; }
+      .hp-text { font-size: 0.7em; }
     }
   </style>
 </head>
@@ -1560,6 +1618,7 @@
       const W = survivalCanvas.width;
       const H = survivalCanvas.height;
       const now = performance.now();
+      const isMobile = W < 400;
 
       sCtx.clearRect(0, 0, W, H);
       drawSurvivalField(W, H);
@@ -1575,7 +1634,8 @@
       }).sort((a, b) => a.qvY - b.qvY);
 
       for (const { char, qvX, qvY } of toDraw) {
-        const scale = char.isMonster ? 0.6 : 0.8;
+        const mobileScale = isMobile ? 0.7 : 1.0;
+        const scale = (char.isMonster ? 0.6 : 0.8) * mobileScale;
         let deathProgress;
         const da = survivalDeathAnims.get(char.id);
         if (da) {
