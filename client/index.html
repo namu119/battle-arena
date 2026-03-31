@@ -772,7 +772,7 @@
     <div id="survivalTickInfo" class="survival-tick-info"></div>
     <div style="position:relative;width:100%;max-width:800px">
       <canvas id="survival-canvas"></canvas>
-      <div id="survivalNotify"></div>
+      <!-- notify 통합: 하단 로그로 이동 -->
     </div>
     <!-- HP바: 하단 4명 일렬 -->
     <div id="survivalHpBars" class="survival-hp-bottom"></div>
@@ -2158,15 +2158,8 @@
     }
 
     function survivalNotify(text, color) {
-      const el = document.getElementById('survivalNotify');
-      if (!el) return;
-      const item = document.createElement('div');
-      item.className = 'survival-notify-item';
-      item.style.color = color || '#7ec8e3';
-      item.style.borderColor = color || '#7ec8e3';
-      item.textContent = text;
-      el.appendChild(item);
-      setTimeout(() => item.remove(), 2100);
+      // 통합: 하단 로그로만 출력 (우측 상단 toast 제거)
+      survivalLogAdd(text);
     }
 
     // ─── Survival Socket Events ───
@@ -2274,19 +2267,15 @@
           if (evt.dropType === 'enhancement') {
             const msg = `🔨 ${slotNames[evt.slot]||evt.slot} +${evt.level} 강화!`;
             survivalNotify(msg, '#f0a500');
-            survivalLogAdd(msg);
           } else if (evt.dropType === 'goldOverflow') {
             const msg = `💰 +${evt.gold}G (${slotNames[evt.slot]} MAX)`;
             survivalNotify(msg, '#f0a500');
-            survivalLogAdd(msg);
           } else if (evt.dropType === 'goldEnhance') {
             const msg = `💰 골드 강화: ${slotNames[evt.slot]} +${evt.level}`;
             survivalNotify(msg, '#7ec8e3');
-            survivalLogAdd(msg);
           } else if (evt.dropType === 'playerKill') {
             const msg = `⚔ ${evt.victimName} 처치! +${evt.gold}G${evt.stolenSlot ? ' +' + (slotNames[evt.stolenSlot]||evt.stolenSlot) + ' 탈취' : ''}`;
             survivalNotify(msg, '#ff4444');
-            survivalLogAdd(msg);
           }
         }
         if (evt.type === 'skill') {
