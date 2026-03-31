@@ -276,17 +276,20 @@ function survivalNotify(text, color, isCharLog) {
 // ─── HP카드 탭 → 로그 필터 ───
 var hpBarsEl = document.getElementById('survivalHpBars');
 if (hpBarsEl) {
-  var lastToggleTime = 0;
+  // 모바일: touchend로 처리 + preventDefault로 click 차단
+  hpBarsEl.addEventListener('touchend', function(e) {
+    var card = e.target.closest('.survival-hp-card');
+    if (!card) return;
+    e.preventDefault(); // click 이벤트 발생 차단
+    var charId = card.dataset.charId;
+    if (charId) toggleLogFilter(charId);
+  });
+  // 데스크탑: click (모바일에서는 위에서 preventDefault로 안 발생)
   hpBarsEl.addEventListener('click', function(e) {
-    // 모바일 더블 이벤트 방지 (300ms 디바운스)
-    var now = Date.now();
-    if (now - lastToggleTime < 300) return;
-    lastToggleTime = now;
     var card = e.target.closest('.survival-hp-card');
     if (!card) return;
     var charId = card.dataset.charId;
-    if (!charId) return;
-    toggleLogFilter(charId);
+    if (charId) toggleLogFilter(charId);
   });
 }
 
