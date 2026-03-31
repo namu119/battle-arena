@@ -342,13 +342,14 @@
       overflow-y: auto;
       margin: 4px auto;
       padding: 4px 8px;
-      background: rgba(22,33,62,0.6);
+      background: rgba(22,33,62,0.8);
       border-radius: 6px;
       font-size: 0.75em;
-      color: #aaa;
+      color: #ccc;
+      border: 1px solid rgba(126,200,227,0.15);
     }
     .survival-log-entry {
-      padding: 1px 0;
+      padding: 2px 0;
       border-bottom: 1px solid rgba(255,255,255,0.05);
     }
     #survivalNotify {
@@ -559,13 +560,22 @@
       .survival-hp-card .hp-bar-outer { height: 7px; margin: 2px 0; }
       .survival-hp-card .hp-info { font-size: 0.62em; }
 
-      /* 서바이벌 로그 모바일 */
+      /* 서바이벌 로그 모바일: 하단 고정 */
       .survival-log {
-        max-height: 40px;
-        font-size: 0.68em;
-        width: calc(100% - 8px);
-        margin: 2px auto;
-        padding: 3px 6px;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        max-height: 60px;
+        max-width: 100%;
+        width: 100%;
+        margin: 0;
+        padding: 4px 8px;
+        border-radius: 0;
+        font-size: 0.72em;
+        background: rgba(10,10,30,0.92);
+        border-top: 1px solid rgba(126,200,227,0.2);
+        z-index: 40;
       }
 
       /* 서바이벌 틱 */
@@ -637,8 +647,8 @@
       .survival-hp-card .hp-info { display: none; }
       .survival-hp-card .hp-bar-outer { height: 5px; }
 
-      /* 로그 숨김 */
-      .survival-log { display: none; }
+      /* 로그: 초소형에서도 하단 고정 유지 */
+      .survival-log { max-height: 48px; font-size: 0.65em; }
 
       /* 전투 */
       #battle-screen > div:first-child { margin: 4px auto !important; gap: 4px !important; }
@@ -1823,6 +1833,8 @@
       deathAnims.clear();
       deadAnimated.clear();
       survivalAnimations = [];
+      const logEl = document.getElementById('survivalLog');
+      if (logEl) logEl.style.display = 'none';
       showScreen((soloPlay || survivalPlay) ? 'lobby' : 'workshop');
       if (!soloPlay && !survivalPlay) initWorkshop();
     }
@@ -2167,6 +2179,8 @@
       isSurvivalActive = true;
       const sti = document.getElementById('survivalTickInfo');
       if (sti) sti.textContent = `총 ${totalTicks}틱`;
+      const logEl = document.getElementById('survivalLog');
+      if (logEl) { logEl.style.display = ''; logEl.innerHTML = ''; }
       survivalAnimFrameId = requestAnimationFrame(survivalAnimLoop);
     });
 
@@ -2287,6 +2301,8 @@
       survivalAnimations = [];
       survivalDeathAnims.clear();
       survivalDeadAnimated.clear();
+      const logEl = document.getElementById('survivalLog');
+      if (logEl) logEl.style.display = 'none';
 
       showScreen('result-screen');
       const el = document.getElementById('resultCards');
