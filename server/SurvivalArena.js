@@ -30,6 +30,8 @@ class SurvivalArena {
     for (const char of this.engine.characters) {
       char._wallSide = this.walls.map(w => char.x < w.x ? 'left' : 'right');
     }
+    // Clamp gatekeepers to their wall position (don't wander away)
+    this._clampGatekeepers = true;
     this.waveManager = new MonsterWaveManager();
     this.dropSystem = new DropSystem();
     this.tick = 0;
@@ -45,12 +47,13 @@ class SurvivalArena {
   }
 
   _assignZones(builds) {
-    // Wider map (1600px): players at 4 corners, walls at 550/1050
+    // Wider map (1600px): players outside wall columns
+    // Wall 1: col3 = x480-640 (center=560), Wall 2: col7 = x1120-1280 (center=1200)
     const zonePositions = [
-      { x: 80, zoneId: 0 },     // zone 0: far left
-      { x: 450, zoneId: 1 },    // zone 1: left-center (near wall 1)
-      { x: 1150, zoneId: 2 },   // zone 2: right-center (near wall 2)
-      { x: 1520, zoneId: 3 },   // zone 3: far right
+      { x: 100, zoneId: 0 },    // zone 0: far left
+      { x: 380, zoneId: 1 },    // zone 1: left (before wall 1 at 480)
+      { x: 1380, zoneId: 2 },   // zone 2: right (after wall 2 at 1280)
+      { x: 1500, zoneId: 3 },   // zone 3: far right
     ];
 
     return builds.map((build, i) => {
@@ -330,6 +333,26 @@ class SurvivalArena {
     for (const char of this.engine.characters) {
       if (!char._wallSide) {
         char._wallSide = this.walls.map(w => char.x < w.x ? 'left' : 'right');
+      }
+    }
+
+    // Clamp gatekeepers near their wall (don't wander too far)
+    const colWidth = 1600 / 10;
+    for (const char of this.engine.characters) {
+      if (char.isGatekeeper && char.alive) {
+        // Find nearest wall
+        let nearestWall = null;
+        let nearestDist = Infinity;
+        for (const w of this.walls) {
+          const dist = Math.abs(char.x - (w.x + colWidth / 2));
+          if (dist < nearestDist) { nearestDist = dist; nearestWall = w; }
+        }
+        if (nearestWall) {
+          // Keep within wall column ± 30px
+          const wallCenter = nearestWall.x + colWidth / 2;
+          if (char.x < wallCenter - 80) char.x = wallCenter - 80;
+          if (char.x > wallCenter + 80) char.x = wallCenter + 80;
+        }
       }
     }
 

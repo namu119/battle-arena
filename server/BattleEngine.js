@@ -296,16 +296,19 @@ class BattleEngine {
     char.x = Math.max(0, Math.min(ARENA_WIDTH, char.x));
     char.y = Math.max(0, Math.min(ARENA_HEIGHT, char.y));
 
-    // 벽 차단: 활성 벽을 넘을 수 없음
+    // 벽 차단: 벽 중심선 기준, 자기 쪽에서 반대쪽으로 넘어가지 못함
     if (this.wallBarriers.length > 0 && char._wallSide) {
+      const colWidth = ARENA_WIDTH / 10;
       for (let wi = 0; wi < this.wallBarriers.length; wi++) {
         const wb = this.wallBarriers[wi];
         if (!wb.active) continue;
+        const wallCenter = wb.x + colWidth / 2; // 벽 중심
         const side = char._wallSide[wi];
-        if (side === 'left' && char.x > wb.x - 20) {
-          char.x = wb.x - 20;
-        } else if (side === 'right' && char.x < wb.x + 20) {
-          char.x = wb.x + 20;
+        // 왼쪽 캐릭터: 벽 중심을 넘을 수 없음 (게이트키퍼 공격은 벽 가장자리까지 허용)
+        if (side === 'left' && char.x > wallCenter) {
+          char.x = wallCenter;
+        } else if (side === 'right' && char.x < wallCenter) {
+          char.x = wallCenter;
         }
       }
     }

@@ -2000,15 +2000,13 @@
             sCtx.moveTo(shifted[1].sx, shifted[1].sy);
             sCtx.lineTo(shifted[3].sx, shifted[3].sy);
             sCtx.stroke();
-            // 벽 아이콘 (가운데 행에만)
-            if (r === Math.floor(GRID_ROWS / 2)) {
-              const mx = (shifted[0].sx + shifted[2].sx) / 2;
-              const my = (shifted[0].sy + shifted[2].sy) / 2;
-              sCtx.fillStyle = '#e94560';
-              sCtx.font = `${Math.round(W * 0.025)}px sans-serif`;
-              sCtx.textAlign = 'center';
-              sCtx.fillText('🧱', mx, my + 4);
-            }
+            // 벽 아이콘 (모든 행)
+            const mx = (shifted[0].sx + shifted[2].sx) / 2;
+            const my = (shifted[0].sy + shifted[2].sy) / 2;
+            sCtx.fillStyle = '#e94560';
+            sCtx.font = `${Math.round(W * 0.02)}px sans-serif`;
+            sCtx.textAlign = 'center';
+            sCtx.fillText('🧱', mx, my + 3);
           } else {
             // 일반 셀
             const zone = c < WALL_COLS[0] ? 0 : c < WALL_COLS[1] ? 1 : 2;
