@@ -190,4 +190,10 @@ function backToLobby() {
   G.socket.emit('getRooms');
 }
 
+// 게임 종료 → 로비로 자동 복귀
+G.socket.on('gameOver', function() {
+  // 결과 화면 3초 후 로비로
+  setTimeout(function() { backToLobby(); }, 3000);
+});
+
 G.socket.on('error', function(msg) { alert(msg); });

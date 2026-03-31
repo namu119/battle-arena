@@ -422,14 +422,22 @@ io.on('connection', (socket) => {
 
   function cleanupRoom() {
     if (currentRoom) {
-      currentRoom.state = 'waiting';
+      // 방 삭제 (게임 끝나면 방 제거)
+      rooms.delete(currentRoom.id);
+      // 모든 플레이어 소켓의 currentRoomId 초기화
       for (const s of currentRoom.slots) {
-        if (s.type === 'player') s.build = null;
+        if (s.type === 'player' && s.socketId) {
+          const psock = io.sockets.sockets.get(s.socketId);
+          // 클라이언트에 로비로 돌아가라고 알림
+          if (psock) psock.emit('gameOver');
+        }
       }
       broadcastRoomList();
     }
     currentArena = null;
     currentRoom = null;
+    currentRoomId = null;
+    if (rewardTimeout) { clearTimeout(rewardTimeout); rewardTimeout = null; }
   }
 });
 

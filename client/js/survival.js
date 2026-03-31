@@ -233,13 +233,24 @@ function survivalLogAdd(text, charIds) {
   renderLog();
 }
 
+// 로그 필터: Set으로 관리 (빈 Set = 전체, charId 있으면 해당 캐릭터 포함)
+G.logFilterSet = new Set();
+
 function renderLog() {
   var el = document.getElementById('survivalLog');
   if (!el) return;
   el.innerHTML = '';
-  var filtered = G.logFilter === 'all'
+  var filtered = G.logFilterSet.size === 0
     ? G.logEntries
-    : G.logEntries.filter(function(e) { return e.charIds.length === 0 || e.charIds.includes(G.logFilter); });
+    : G.logEntries.filter(function(e) {
+        // 시스템 로그(charIds 없음)는 항상 표시
+        if (e.charIds.length === 0) return true;
+        // 선택된 캐릭터 중 하나라도 관련되면 표시
+        for (var j = 0; j < e.charIds.length; j++) {
+          if (G.logFilterSet.has(e.charIds[j])) return true;
+        }
+        return false;
+      });
   var entries = filtered.slice(-30);
   for (var i = 0; i < entries.length; i++) {
     var entry = document.createElement('div');
@@ -250,27 +261,14 @@ function renderLog() {
   el.scrollTop = el.scrollHeight;
 }
 
-function setLogFilter(filter) {
-  G.logFilter = filter;
-  document.querySelectorAll('.log-filter-btn').forEach(function(b) {
-    b.classList.toggle('active', b.dataset.filter === filter);
-  });
-  renderLog();
-}
-
-function initLogFilters() {
-  var el = document.getElementById('logFilters');
-  if (!el) return;
-  var players = G.survivalChars.filter(function(c) { return !c.isMonster; });
-  el.innerHTML = '<button class="log-filter-btn active" data-filter="all">전체</button>';
-  for (var i = 0; i < players.length; i++) {
-    var p = players[i];
-    var color = G.classColors[p.className] || '#e94560';
-    el.innerHTML += '<button class="log-filter-btn" data-filter="' + p.id + '" style="border-color:' + color + '">' + esc(p.name) + '</button>';
+function toggleLogFilter(charId) {
+  if (G.logFilterSet.has(charId)) {
+    G.logFilterSet.delete(charId);
+  } else {
+    G.logFilterSet.add(charId);
   }
-  el.querySelectorAll('.log-filter-btn').forEach(function(b) {
-    b.addEventListener('click', function() { setLogFilter(b.dataset.filter); });
-  });
+  renderLog();
+  // HP카드 시각 업데이트는 다음 틱에서 자동 반영
 }
 
 function survivalNotify(text, color) {
@@ -285,11 +283,7 @@ if (hpBarsEl) {
     if (!card) return;
     var charId = card.dataset.charId;
     if (!charId) return;
-    if (G.logFilter === charId) {
-      setLogFilter('all');
-    } else {
-      setLogFilter(charId);
-    }
+    toggleLogFilter(charId);
   });
 }
 
@@ -308,17 +302,14 @@ G.socket.on('survivalStart', function(data) {
   if (sti) sti.textContent = '총 ' + data.totalTicks + '틱';
   G.logEntries = [];
   G.logFilter = 'all';
-  G.logFiltersInited = false;
+  G.logFilterSet = new Set();
   renderLog();
   G.survivalAnimFrameId = requestAnimationFrame(survivalAnimLoop);
 });
 
 G.socket.on('survivalTick', function(data) {
   G.survivalChars = data.state;
-  if (!G.logFiltersInited && G.survivalChars.length > 0) {
-    G.logFiltersInited = true;
-    initLogFilters();
-  }
+  // 로그 필터는 HP카드 탭으로 직접 토글
   G.survivalPhase = data.phase || 1;
   G.survivalActiveZones = data.activeZones || [0,1,2,3];
 
@@ -357,7 +348,7 @@ G.socket.on('survivalTick', function(data) {
     var chaos = (c.chaos || 0) > 0 ? '<span style="color:#ff4444;font-size:0.8em"> \uD83D\uDD25' + c.chaos + '</span>' : '';
     var isMe = c.id === 'p0';
     var border = isMe ? 'border:1px solid #e94560' : '';
-    var filterCls = G.logFilter === c.id ? 'filter-active' : '';
+    var filterCls = G.logFilterSet.has(c.id) ? 'filter-active' : '';
     return '<div class="survival-hp-card ' + (c.alive ? '' : 'dead') + ' ' + filterCls + '" data-char-id="' + c.id + '" style="' + border + '">' +
       '<div class="hp-name" style="color:' + color + '">' + esc(c.name) + chaos + '</div>' +
       '<div class="hp-bar-outer"><div class="hp-bar-inner" style="width:' + pct + '%;background:' + color + '"></div></div>' +
