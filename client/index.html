@@ -341,23 +341,59 @@
       color: #aaa;
     }
     .survival-hp-card.dead { opacity: 0.4; }
-    .survival-log {
+    .survival-log-wrap {
       width: 100%;
       max-width: 800px;
-      max-height: 160px;
+      margin: 4px auto 0;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 60px;
+    }
+    .log-filters {
+      display: flex;
+      gap: 4px;
+      padding: 4px 8px;
+      overflow-x: auto;
+    }
+    .log-filter-btn {
+      background: #16213e;
+      border: 1px solid #333;
+      color: #aaa;
+      border-radius: 12px;
+      padding: 3px 10px;
+      font-size: 0.72em;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+    .log-filter-btn.active {
+      background: #e94560;
+      border-color: #e94560;
+      color: #fff;
+    }
+    .survival-log {
+      width: 100%;
+      flex: 1;
       overflow-y: auto;
-      margin: 6px auto;
-      padding: 8px 12px;
+      padding: 6px 10px;
       background: rgba(22,33,62,0.85);
       border-radius: 8px;
       font-size: 0.82em;
       color: #ccc;
       border: 1px solid rgba(126,200,227,0.2);
       line-height: 1.5;
+      max-height: 180px;
     }
     .survival-log-entry {
-      padding: 3px 0;
+      padding: 2px 0;
       border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .survival-log-entry.highlight {
+      color: #fff;
+      background: rgba(233,69,96,0.1);
+      padding: 3px 4px;
+      border-radius: 3px;
     }
     #survivalNotify {
       position: absolute;
@@ -568,13 +604,14 @@
       .survival-hp-card .hp-info { font-size: 0.62em; }
 
       /* 서바이벌 로그 모바일 */
+      .survival-log-wrap { min-height: 40px; }
       .survival-log {
-        max-height: 120px;
-        width: calc(100% - 8px);
-        margin: 4px auto;
-        padding: 6px 8px;
-        font-size: 0.75em;
+        max-height: 100px;
+        font-size: 0.72em;
+        padding: 4px 6px;
       }
+      .log-filters { padding: 2px 4px; gap: 3px; }
+      .log-filter-btn { font-size: 0.65em; padding: 2px 8px; }
 
       /* 서바이벌 틱 */
       #survivalTickInfo { font-size: 0.7em !important; text-align: center; }
@@ -646,7 +683,8 @@
       .survival-hp-card .hp-bar-outer { height: 5px; }
 
       /* 로그: 초소형 */
-      .survival-log { max-height: 80px; font-size: 0.68em; }
+      .survival-log { max-height: 70px; font-size: 0.63em; }
+      .log-filter-btn { font-size: 0.6em; padding: 2px 6px; }
 
       /* 전투 */
       #battle-screen > div:first-child { margin: 4px auto !important; gap: 4px !important; }
@@ -777,8 +815,13 @@
     </div>
     <!-- HP바: 하단 4명 일렬 -->
     <div id="survivalHpBars" class="survival-hp-bottom"></div>
-    <!-- 전투 로그 -->
-    <div id="survivalLog" class="survival-log"></div>
+    <!-- 전투 로그 (필터 포함) -->
+    <div class="survival-log-wrap">
+      <div class="log-filters" id="logFilters">
+        <button class="log-filter-btn active" data-filter="all">전체</button>
+      </div>
+      <div id="survivalLog" class="survival-log"></div>
+    </div>
   </div>
 
   <!-- 결과 화면 -->
@@ -1838,8 +1881,8 @@
       deathAnims.clear();
       deadAnimated.clear();
       survivalAnimations = [];
-      const logEl = document.getElementById('survivalLog');
-      if (logEl) logEl.innerHTML = '';
+      logEntries = [];
+      renderLog();
       showScreen((soloPlay || survivalPlay) ? 'lobby' : 'workshop');
       if (!soloPlay && !survivalPlay) initWorkshop();
     }
@@ -2146,16 +2189,58 @@
       }
     }
 
-    function survivalLogAdd(text) {
+    let logFilter = 'all';
+    let logEntries = []; // {text, charIds:[]}
+
+    function survivalLogAdd(text, charIds) {
+      const ids = charIds || [];
+      // Auto-detect character names in text
+      if (ids.length === 0 && survivalChars.length > 0) {
+        for (const c of survivalChars) {
+          if (!c.isMonster && text.includes(c.name)) ids.push(c.id);
+        }
+      }
+      logEntries.push({ text, charIds: ids });
+      if (logEntries.length > 50) logEntries.shift();
+      renderLog();
+    }
+
+    function renderLog() {
       const el = document.getElementById('survivalLog');
       if (!el) return;
-      const entry = document.createElement('div');
-      entry.className = 'survival-log-entry';
-      entry.textContent = text;
-      el.appendChild(entry);
+      el.innerHTML = '';
+      const filtered = logFilter === 'all'
+        ? logEntries
+        : logEntries.filter(e => e.charIds.length === 0 || e.charIds.includes(logFilter));
+      for (const e of filtered.slice(-30)) {
+        const entry = document.createElement('div');
+        entry.className = 'survival-log-entry';
+        entry.textContent = e.text;
+        el.appendChild(entry);
+      }
       el.scrollTop = el.scrollHeight;
-      // Keep max 30 entries
-      while (el.children.length > 30) el.removeChild(el.firstChild);
+    }
+
+    function setLogFilter(filter) {
+      logFilter = filter;
+      document.querySelectorAll('.log-filter-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.filter === filter);
+      });
+      renderLog();
+    }
+
+    function initLogFilters() {
+      const el = document.getElementById('logFilters');
+      if (!el) return;
+      const players = survivalChars.filter(c => !c.isMonster);
+      el.innerHTML = '<button class="log-filter-btn active" data-filter="all">전체</button>';
+      for (const p of players) {
+        const color = classColors[p.className] || '#e94560';
+        el.innerHTML += `<button class="log-filter-btn" data-filter="${p.id}" style="border-color:${color}">${esc(p.name)}</button>`;
+      }
+      el.querySelectorAll('.log-filter-btn').forEach(b => {
+        b.addEventListener('click', () => setLogFilter(b.dataset.filter));
+      });
     }
 
     function survivalNotify(text, color) {
@@ -2176,13 +2261,20 @@
       isSurvivalActive = true;
       const sti = document.getElementById('survivalTickInfo');
       if (sti) sti.textContent = `총 ${totalTicks}틱`;
-      const logEl = document.getElementById('survivalLog');
-      if (logEl) logEl.innerHTML = '';
+      logEntries = [];
+      logFilter = 'all';
+      logFiltersInited = false;
+      renderLog();
       survivalAnimFrameId = requestAnimationFrame(survivalAnimLoop);
     });
 
+    let logFiltersInited = false;
     socket.on('survivalTick', (data) => {
       survivalChars = data.state;
+      if (!logFiltersInited && survivalChars.length > 0) {
+        logFiltersInited = true;
+        initLogFilters();
+      }
       survivalPhase = data.phase || 1;
       survivalActiveZones = data.activeZones || [0,1,2,3];
 
@@ -2321,8 +2413,8 @@
       survivalAnimations = [];
       survivalDeathAnims.clear();
       survivalDeadAnimated.clear();
-      const logEl = document.getElementById('survivalLog');
-      if (logEl) logEl.innerHTML = '';
+      logEntries = [];
+      renderLog();
 
       showScreen('result-screen');
       const el = document.getElementById('resultCards');
