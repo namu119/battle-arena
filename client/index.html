@@ -344,19 +344,20 @@
     .survival-log {
       width: 100%;
       max-width: 800px;
-      max-height: 80px;
+      max-height: 160px;
       overflow-y: auto;
-      margin: 4px auto;
-      padding: 4px 8px;
-      background: rgba(22,33,62,0.8);
-      border-radius: 6px;
-      font-size: 0.75em;
+      margin: 6px auto;
+      padding: 8px 12px;
+      background: rgba(22,33,62,0.85);
+      border-radius: 8px;
+      font-size: 0.82em;
       color: #ccc;
-      border: 1px solid rgba(126,200,227,0.15);
+      border: 1px solid rgba(126,200,227,0.2);
+      line-height: 1.5;
     }
     .survival-log-entry {
-      padding: 2px 0;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
+      padding: 3px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
     }
     #survivalNotify {
       position: absolute;
@@ -566,13 +567,13 @@
       .survival-hp-card .hp-bar-outer { height: 7px; margin: 2px 0; }
       .survival-hp-card .hp-info { font-size: 0.62em; }
 
-      /* 서바이벌 로그 모바일: HP 하단 */
+      /* 서바이벌 로그 모바일 */
       .survival-log {
-        max-height: 50px;
+        max-height: 120px;
         width: calc(100% - 8px);
-        margin: 2px auto;
-        padding: 3px 6px;
-        font-size: 0.68em;
+        margin: 4px auto;
+        padding: 6px 8px;
+        font-size: 0.75em;
       }
 
       /* 서바이벌 틱 */
@@ -645,7 +646,7 @@
       .survival-hp-card .hp-bar-outer { height: 5px; }
 
       /* 로그: 초소형 */
-      .survival-log { max-height: 36px; font-size: 0.6em; }
+      .survival-log { max-height: 80px; font-size: 0.68em; }
 
       /* 전투 */
       #battle-screen > div:first-child { margin: 4px auto !important; gap: 4px !important; }
