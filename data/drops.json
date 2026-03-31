@@ -42,8 +42,8 @@
     "goldAutoEnhanceBonus": { "min": 1, "max": 2 }
   },
   "walls": [
-    { "x": 550, "label": "1차 관문", "stage": 1 },
-    { "x": 1050, "label": "2차 관문", "stage": 2 }
+    { "x": 480, "label": "1차 관문", "stage": 1 },
+    { "x": 1120, "label": "2차 관문", "stage": 2 }
   ],
   "waveSchedule": {
     "phase1": [
