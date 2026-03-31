@@ -1,4 +1,4 @@
-// ─── Random Life Workshop ───
+// ─── Workshop: 랜덤 인생 위저드 ───
 var G = window.Game;
 
 var selectedClass = null;
@@ -7,40 +7,43 @@ var equip = { helmet:null, armor:null, weapon:null, boots:null };
 var selectedSkills = [];
 var INITIAL_GOLD = 1000;
 var rerollsLeft = 10;
+var wizardStep = 0; // 0=class, 1=equip, 2=skill
+var wizardTimerId = null;
+var wizardTimeLeft = 0;
 
 var CLASS_ICONS = { '전사':'⚔️', '마법사':'🔮', '도적':'🗡️', '기사':'🛡️', '궁수':'🏹' };
 var CLASS_COLORS_MAP = { '전사':'#e94560', '마법사':'#7b2ff7', '도적':'#2ecc71', '기사':'#3498db', '궁수':'#f39c12' };
-var STAT_NAMES = { ATK: '공격', DEF: '방어', INT: '지능', SPD: '속도' };
-var STAT_COLORS = { ATK: '#e94560', DEF: '#3498db', INT: '#7b2ff7', SPD: '#f39c12' };
+var STAT_NAMES = { ATK:'공격', DEF:'방어', INT:'지능', SPD:'속도' };
+var slotCategory = { helmet:'helmets', armor:'armors', weapon:'weapons', boots:'boots' };
+var SLOT_NAMES = { helmet:'투구', armor:'갑옷', weapon:'무기', boots:'신발' };
 
 function initWorkshop() {
   rerollsLeft = 10;
+  wizardStep = 0;
   randomizeClass();
   randomizeEquip();
   randomizeSkills();
-  renderWorkshop();
+  startWizardStep();
 }
 
+// ─── 랜덤 생성 ───
 function randomizeClass() {
   var classNames = Object.keys(G.classData);
   selectedClass = classNames[Math.floor(Math.random() * classNames.length)];
-  // Random stat allocation (10 points)
   stats = { ATK:0, DEF:0, INT:0, SPD:0 };
   var keys = ['ATK','DEF','INT','SPD'];
   var remaining = 10;
   while (remaining > 0) {
-    var k = keys[Math.floor(Math.random() * keys.length)];
-    stats[k]++;
+    keys[Math.floor(Math.random() * keys.length)];
+    stats[keys[Math.floor(Math.random() * keys.length)]]++;
     remaining--;
   }
 }
 
 function randomizeEquip() {
-  var slotCategory = { helmet:'helmets', armor:'armors', weapon:'weapons', boots:'boots' };
   equip = { helmet:null, armor:null, weapon:null, boots:null };
   var gold = INITIAL_GOLD;
   var slots = ['helmet','armor','weapon','boots'];
-  // Shuffle slot order for variety
   for (var i = slots.length - 1; i > 0; i--) {
     var j = Math.floor(Math.random() * (i + 1));
     var tmp = slots[i]; slots[i] = slots[j]; slots[j] = tmp;
@@ -49,8 +52,7 @@ function randomizeEquip() {
     var slot = slots[si];
     var cat = G.equipData[slotCategory[slot]];
     if (!cat) continue;
-    var items = Object.entries(cat);
-    var affordable = items.filter(function(e) { return e[1].cost <= gold; });
+    var affordable = Object.entries(cat).filter(function(e) { return e[1].cost <= gold; });
     if (affordable.length === 0) continue;
     var pick = affordable[Math.floor(Math.random() * affordable.length)];
     equip[slot] = pick[0];
@@ -59,167 +61,208 @@ function randomizeEquip() {
 }
 
 function randomizeSkills() {
-  var slotCategory = { helmet:'helmets', armor:'armors', weapon:'weapons', boots:'boots' };
   var candidates = [];
   for (var slot in equip) {
     if (!equip[slot]) continue;
     var cat = G.equipData[slotCategory[slot]];
     if (cat && cat[equip[slot]]) candidates.push(cat[equip[slot]].skill.name);
   }
-  // Shuffle and pick 3
-  for (var i = candidates.length - 1; i > 0; i--) {
-    var j = Math.floor(Math.random() * (i + 1));
-    var tmp = candidates[i]; candidates[i] = candidates[j]; candidates[j] = tmp;
-  }
+  candidates.sort(function() { return Math.random() - 0.5; });
   selectedSkills = candidates.slice(0, 3);
 }
 
-function rerollSection(section) {
-  if (rerollsLeft <= 0) return;
-  rerollsLeft--;
-  if (section === 'class') randomizeClass();
-  else if (section === 'equip') { randomizeEquip(); randomizeSkills(); }
-  else if (section === 'skill') randomizeSkills();
-  renderWorkshop();
+// ─── 위저드 단계 관리 ───
+function startWizardStep() {
+  updateRerollDisplay();
+  if (wizardTimerId) { clearInterval(wizardTimerId); wizardTimerId = null; }
+
+  var content = document.getElementById('wizardContent');
+  var actions = document.getElementById('wizardActions');
+  var radarSec = document.getElementById('radarSection');
+  var ctaDiv = document.getElementById('workshopCta');
+
+  if (wizardStep === 0) {
+    // STEP 1: 병과 + 스탯
+    content.innerHTML = renderClassCard();
+    actions.style.display = 'flex';
+    radarSec.style.display = 'block';
+    ctaDiv.style.display = 'none';
+    renderStatRadar();
+    startTimer(5);
+  } else if (wizardStep === 1) {
+    // STEP 2: 장비
+    content.innerHTML = renderEquipCards();
+    actions.style.display = 'flex';
+    radarSec.style.display = 'block';
+    renderStatRadar();
+    startTimer(5);
+  } else if (wizardStep === 2) {
+    // STEP 3: 스킬 (자동 결정, 바로 출전)
+    content.innerHTML = renderSkillCards();
+    actions.style.display = 'none';
+    radarSec.style.display = 'block';
+    ctaDiv.style.display = '';
+    renderStatRadar();
+    if (wizardTimerId) { clearInterval(wizardTimerId); wizardTimerId = null; }
+    document.getElementById('wizardTimer').textContent = '';
+  }
 }
 
-function renderWorkshop() {
-  document.getElementById('rerollCount').textContent = rerollsLeft;
-  // Disable reroll buttons when 0
-  document.querySelectorAll('.reroll-btn').forEach(function(btn) {
+function startTimer(seconds) {
+  wizardTimeLeft = seconds;
+  updateTimerDisplay();
+  if (wizardTimerId) clearInterval(wizardTimerId);
+  wizardTimerId = setInterval(function() {
+    wizardTimeLeft--;
+    updateTimerDisplay();
+    if (wizardTimeLeft <= 0) {
+      clearInterval(wizardTimerId);
+      wizardTimerId = null;
+      wizardConfirm(); // 자동 확정
+    }
+  }, 1000);
+}
+
+function updateTimerDisplay() {
+  var el = document.getElementById('wizardTimer');
+  if (el) el.textContent = wizardTimeLeft > 0 ? wizardTimeLeft + '초' : '';
+}
+
+function updateRerollDisplay() {
+  var el = document.getElementById('rerollCount');
+  if (el) el.textContent = rerollsLeft;
+  var btn = document.getElementById('rerollBtn');
+  if (btn) {
     btn.disabled = rerollsLeft <= 0;
     btn.style.opacity = rerollsLeft <= 0 ? '0.4' : '1';
-  });
-  renderClassDisplay();
-  renderEquipDisplay();
-  renderSkillDisplay();
-  renderStatRadar();
-  updateGold();
-  // Validate: all must be filled
-  var valid = selectedClass && Object.values(equip).every(function(v) { return v; }) && selectedSkills.length >= 3;
-  document.getElementById('submitBtn').disabled = !valid;
+    btn.textContent = rerollsLeft > 0 ? '🔄 리롤 (' + rerollsLeft + ')' : '🔄 소진';
+  }
 }
 
-function renderClassDisplay() {
-  var container = document.getElementById('classDisplay');
-  if (!selectedClass || !G.classData[selectedClass]) {
-    container.innerHTML = '<span style="color:#666">랜덤 선택 중...</span>';
-    return;
+// ─── 리롤 / 확정 ───
+function wizardReroll() {
+  if (rerollsLeft <= 0) return;
+  rerollsLeft--;
+  if (wizardStep === 0) randomizeClass();
+  else if (wizardStep === 1) { randomizeEquip(); randomizeSkills(); }
+  startWizardStep(); // 타이머 5초 재시작
+}
+
+function wizardConfirm() {
+  if (wizardTimerId) { clearInterval(wizardTimerId); wizardTimerId = null; }
+  wizardStep++;
+  if (wizardStep <= 2) {
+    startWizardStep();
   }
+}
+
+// ─── 렌더링 ───
+function renderClassCard() {
+  if (!selectedClass || !G.classData[selectedClass]) return '<div style="color:#666">로딩중...</div>';
   var cls = G.classData[selectedClass];
   var icon = CLASS_ICONS[selectedClass] || '⚔️';
   var color = CLASS_COLORS_MAP[selectedClass] || '#e94560';
+  var statBadges = Object.entries(stats).map(function(e) {
+    return e[1] > 0 ? '<span style="background:' + color + ';color:#fff;border-radius:4px;padding:2px 6px;font-size:0.8em;margin:2px">' + STAT_NAMES[e[0]] + ' ' + e[1] + '</span>' : '';
+  }).join('');
 
-  var statBadges = Object.entries(stats).map(function(entry) {
-    var k = entry[0], v = entry[1];
-    if (v === 0) return '';
-    return '<span class="random-stat-badge" style="background:' + (STAT_COLORS[k] || '#555') + '">' + (STAT_NAMES[k] || k) + ':' + v + '</span>';
-  }).filter(Boolean).join(' ');
-
-  container.innerHTML =
-    '<div class="random-class-card" style="border-left:4px solid ' + color + '">' +
-      '<div style="display:flex;align-items:center;gap:8px">' +
-        '<span style="font-size:1.5em">' + icon + '</span>' +
-        '<div>' +
-          '<div style="font-weight:bold;color:#fff;font-size:1.05em">' + esc(selectedClass) + '</div>' +
-          '<div style="color:#888;font-size:0.8em">HP:' + cls.baseHP + ' ATK:' + cls.baseATK + ' DEF:' + cls.baseDEF + ' SPD:' + cls.baseSPD + '</div>' +
-        '</div>' +
-      '</div>' +
-      '<div style="color:#7ec8e3;font-size:0.82em;margin-top:4px">패시브: ' + esc(cls.passive.name) + ' - ' + esc(cls.passive.description) + '</div>' +
-      '<div style="margin-top:6px">' + statBadges + '</div>' +
-    '</div>';
+  return '<div style="text-align:center">' +
+    '<div style="font-size:1.1em;color:#888;margin-bottom:4px">STEP 1/3 — 병과 + 스탯</div>' +
+    '<div style="font-size:2.5em;margin:8px 0">' + icon + '</div>' +
+    '<div style="font-size:1.4em;font-weight:bold;color:' + color + '">' + selectedClass + '</div>' +
+    '<div style="color:#aaa;font-size:0.85em;margin:4px 0">HP:' + cls.baseHP + ' ATK:' + cls.baseATK + ' DEF:' + cls.baseDEF + ' SPD:' + cls.baseSPD + '</div>' +
+    '<div style="color:#7ec8e3;font-size:0.85em">패시브: ' + cls.passive.name + '</div>' +
+    '<div style="margin:8px 0">' + statBadges + '</div>' +
+  '</div>';
 }
 
-function renderEquipDisplay() {
-  var container = document.getElementById('equipDisplay');
-  var slotCategory = { helmet:'helmets', armor:'armors', weapon:'weapons', boots:'boots' };
-  var slotNames = { helmet:'투구', armor:'갑옷', weapon:'무기', boots:'신발' };
-  var slotIcons = { helmet:'🪖', armor:'🛡️', weapon:'⚔️', boots:'👢' };
-
-  var html = '<div class="random-equip-row">';
+function renderEquipCards() {
+  var html = '<div style="text-align:center;color:#888;font-size:1.1em;margin-bottom:8px">STEP 2/3 — 장비 4종</div>';
+  html += '<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center">';
   var slots = ['helmet','armor','weapon','boots'];
   for (var i = 0; i < slots.length; i++) {
     var slot = slots[i];
     var name = equip[slot];
     if (!name) {
-      html += '<div class="random-equip-card empty"><div class="equip-slot-label">' + slotIcons[slot] + ' ' + slotNames[slot] + '</div><div style="color:#666;font-size:0.8em">없음</div></div>';
+      html += '<div class="item-card" style="min-width:120px;text-align:center;opacity:0.4"><div class="item-name">' + SLOT_NAMES[slot] + '</div><div style="color:#666">없음</div></div>';
       continue;
     }
     var cat = G.equipData[slotCategory[slot]];
-    var item = cat ? cat[name] : null;
-    if (!item) continue;
-    var statsStr = Object.entries(item.stats).map(function(s) { return s[0] + '+' + s[1]; }).join(' ');
-    html += '<div class="random-equip-card">' +
-      '<div class="equip-slot-label">' + slotIcons[slot] + ' ' + slotNames[slot] + '</div>' +
-      '<div style="font-weight:bold;color:#fff;font-size:0.88em">' + esc(name) + '</div>' +
-      '<div style="color:#f0a500;font-size:0.75em">' + item.cost + 'G</div>' +
-      '<div style="color:#888;font-size:0.75em">' + statsStr + '</div>' +
-      '<div style="color:#7ec8e3;font-size:0.75em">' + esc(item.skill.name) + '</div>' +
+    var item = cat[name];
+    var statsStr = Object.entries(item.stats).map(function(e) { return e[0] + '+' + e[1]; }).join(' ');
+    html += '<div class="item-card" style="min-width:120px;text-align:center;border-color:#7ec8e3">' +
+      '<div style="font-size:0.7em;color:#888">' + SLOT_NAMES[slot] + '</div>' +
+      '<div class="item-name">' + name + '</div>' +
+      '<div class="item-cost">' + item.cost + 'G</div>' +
+      '<div class="item-stats">' + statsStr + '</div>' +
+      '<div style="color:#7ec8e3;font-size:0.75em">' + item.skill.name + '</div>' +
     '</div>';
   }
   html += '</div>';
-  container.innerHTML = html;
+  return html;
 }
 
-function renderSkillDisplay() {
-  var container = document.getElementById('skillDisplay');
-  if (selectedSkills.length === 0) {
-    container.innerHTML = '<span style="color:#666">스킬 없음</span>';
-    return;
+function renderSkillCards() {
+  var html = '<div style="text-align:center;color:#888;font-size:1.1em;margin-bottom:8px">STEP 3/3 — 스킬 확정</div>';
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">';
+  for (var i = 0; i < selectedSkills.length; i++) {
+    html += '<div class="skill-chip selected">' + selectedSkills[i] + '</div>';
   }
-  container.innerHTML = '<div class="random-skill-row">' + selectedSkills.map(function(name) {
-    return '<div class="random-skill-chip">🎯 ' + esc(name) + '</div>';
-  }).join('') + '</div>';
+  html += '</div>';
+  return html;
 }
 
-function updateGold() {
-  var cost = getTotalCost();
-  var remaining = INITIAL_GOLD - cost;
-  document.getElementById('goldDisplay').textContent = remaining;
-  document.getElementById('goldDisplay').style.color = remaining < 0 ? '#e94560' : '#f0a500';
-}
-
+// ─── 골드 계산 ───
 function getTotalCost() {
   var cost = 0;
-  var slotCategory = { helmet:'helmets', armor:'armors', weapon:'weapons', boots:'boots' };
   for (var slot in equip) {
-    var name = equip[slot];
-    if (!name) continue;
+    if (!equip[slot]) continue;
     var cat = G.equipData[slotCategory[slot]];
-    if (cat && cat[name]) cost += cat[name].cost;
+    if (cat && cat[slot]) cost += cat[slot].cost;
+    if (cat && cat[equip[slot]]) cost += cat[equip[slot]].cost;
   }
   return cost;
 }
 
+function updateGold() {
+  var cost = 0;
+  for (var slot in equip) {
+    if (!equip[slot]) continue;
+    var cat = G.equipData[slotCategory[slot]];
+    if (cat && cat[equip[slot]]) cost += cat[equip[slot]].cost;
+  }
+  var el = document.getElementById('goldDisplay');
+  if (el) {
+    el.textContent = INITIAL_GOLD - cost;
+    el.style.color = (INITIAL_GOLD - cost) < 0 ? '#e94560' : '#f0a500';
+  }
+}
+
+// ─── 빌드 제출 ───
 function submitBuild() {
   try {
     var build = makeBuild();
     if (!build) return;
+    build.playerName = G.myName;
     G.socket.emit('submitBuild', build);
     document.getElementById('submitBtn').disabled = true;
-    document.getElementById('submitBtn').textContent = '제출 완료! 대기중...';
+    document.getElementById('submitBtn').textContent = '대기중...';
   } catch (e) {
-    console.error('빌드 생성 실패', e);
-    alert('빌드 생성 실패: ' + e.message);
+    alert('빌드 오류: ' + e.message);
   }
 }
 
 function makeBuild() {
   var cls = G.classData[selectedClass];
-  if (!cls) throw new Error('병과를 선택하세요');
-  var slotCategory = { helmet:'helmets', armor:'armors', weapon:'weapons', boots:'boots' };
-  var STAT_WEIGHT = 3;
-
+  if (!cls) throw new Error('병과 없음');
   var equipStats = { ATK:0, DEF:0, INT:0, SPD:0 };
   for (var slot in equip) {
-    var name = equip[slot];
-    if (!name) continue;
-    var itemStats = G.equipData[slotCategory[slot]][name].stats;
-    for (var k in itemStats) {
-      if (equipStats[k] !== undefined) equipStats[k] += itemStats[k];
-    }
+    if (!equip[slot]) continue;
+    var cat = G.equipData[slotCategory[slot]];
+    if (!cat || !cat[equip[slot]]) continue;
+    var es = cat[equip[slot]].stats;
+    for (var k in es) { if (equipStats[k] !== undefined) equipStats[k] += es[k]; }
   }
-
   return {
     className: selectedClass,
     passive: cls.passive,
@@ -232,17 +275,17 @@ function makeBuild() {
     },
     range: cls.range,
     btWeights: {
-      survive: cls.btWeights.survive + stats.DEF * STAT_WEIGHT,
-      skill: cls.btWeights.skill + stats.INT * STAT_WEIGHT,
-      attack: cls.btWeights.attack + stats.ATK * STAT_WEIGHT,
+      survive: cls.btWeights.survive + stats.DEF * 3,
+      skill: cls.btWeights.skill + stats.INT * 3,
+      attack: cls.btWeights.attack + stats.ATK * 3,
     },
-    equip: { helmet: equip.helmet, armor: equip.armor, weapon: equip.weapon, boots: equip.boots },
+    equip: Object.assign({}, equip),
     skills: selectedSkills.map(function(skillName) {
-      for (var s in equip) {
-        var itemName = equip[s];
-        if (!itemName) continue;
-        var item = G.equipData[slotCategory[s]][itemName];
-        if (item.skill.name === skillName) return Object.assign({}, item.skill);
+      for (var slot in equip) {
+        if (!equip[slot]) continue;
+        var cat = G.equipData[slotCategory[slot]];
+        if (!cat || !cat[equip[slot]]) continue;
+        if (cat[equip[slot]].skill.name === skillName) return Object.assign({}, cat[equip[slot]].skill);
       }
       return null;
     }).filter(Boolean),
@@ -251,119 +294,94 @@ function makeBuild() {
   };
 }
 
-// ─── 6각형 스탯 레이더 차트 ───
+// ─── 6각형 레이더 차트 ───
 function renderStatRadar() {
   var canvas = document.getElementById('statRadar');
   if (!canvas) return;
   var ctx = canvas.getContext('2d');
   var W = canvas.width, H = canvas.height;
   var cx = W / 2, cy = H / 2;
-  var radius = Math.min(W, H) * 0.38;
-
+  var radius = Math.min(W, H) * 0.36;
   ctx.clearRect(0, 0, W, H);
 
-  // 6축: HP, ATK, DEF, INT, SPD, Range
   var labels = ['HP', 'ATK', 'DEF', 'INT', 'SPD', 'RNG'];
   var labelColors = ['#e94560', '#ff6644', '#3498db', '#7b2ff7', '#f39c12', '#2ecc71'];
   var axes = 6;
   var angleStep = (Math.PI * 2) / axes;
-
-  // 현재 스탯 계산
-  var cls = selectedClass ? G.classData[selectedClass] : null;
-  var maxVals = [800, 30, 25, 15, 15, 250]; // 각 축 최대값
+  var maxVals = [800, 30, 25, 15, 15, 250];
   var vals = [0, 0, 0, 0, 0, 0];
+
+  var cls = selectedClass ? G.classData[selectedClass] : null;
   if (cls) {
-    // 장비 스탯 합산
-    var eqStats = { ATK:0, DEF:0, INT:0, SPD:0 };
-    var slotCat = { helmet:'helmets', armor:'armors', weapon:'weapons', boots:'boots' };
+    var eqS = { ATK:0, DEF:0, INT:0, SPD:0 };
     for (var sl in equip) {
       if (!equip[sl]) continue;
-      var cat = G.equipData[slotCat[sl]];
+      var cat = G.equipData[slotCategory[sl]];
       if (cat && cat[equip[sl]]) {
         var es = cat[equip[sl]].stats;
-        for (var sk in es) { if (eqStats[sk] !== undefined) eqStats[sk] += es[sk]; }
+        for (var k in es) { if (eqS[k] !== undefined) eqS[k] += es[k]; }
       }
     }
     vals = [
-      cls.baseHP + (stats.DEF || 0) * 15,                    // HP
-      cls.baseATK + (stats.ATK || 0) + eqStats.ATK,          // ATK
-      cls.baseDEF + (stats.DEF || 0) + eqStats.DEF,          // DEF
-      (stats.INT || 0) + (eqStats.INT || 0),                  // INT
-      cls.baseSPD + (stats.SPD || 0) + (eqStats.SPD || 0),   // SPD
-      cls.range,                                               // Range
+      cls.baseHP + (stats.DEF || 0) * 15,
+      cls.baseATK + (stats.ATK || 0) + eqS.ATK,
+      cls.baseDEF + (stats.DEF || 0) + eqS.DEF,
+      (stats.INT || 0) + (eqS.INT || 0),
+      cls.baseSPD + (stats.SPD || 0) + (eqS.SPD || 0),
+      cls.range,
     ];
   }
 
-  // 배경 그리드 (3단계)
-  for (var level = 3; level >= 1; level--) {
-    var r = radius * (level / 3);
+  // 배경 그리드
+  for (var lv = 3; lv >= 1; lv--) {
+    var r = radius * (lv / 3);
     ctx.beginPath();
     for (var i = 0; i < axes; i++) {
-      var angle = angleStep * i - Math.PI / 2;
-      var x = cx + Math.cos(angle) * r;
-      var y = cy + Math.sin(angle) * r;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
+      var a = angleStep * i - Math.PI / 2;
+      var x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     }
     ctx.closePath();
     ctx.strokeStyle = 'rgba(126,200,227,0.15)';
-    ctx.lineWidth = 1;
     ctx.stroke();
   }
-
   // 축선
   for (var i = 0; i < axes; i++) {
-    var angle = angleStep * i - Math.PI / 2;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
-    ctx.strokeStyle = 'rgba(126,200,227,0.1)';
-    ctx.stroke();
+    var a = angleStep * i - Math.PI / 2;
+    ctx.beginPath(); ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(a) * radius, cy + Math.sin(a) * radius);
+    ctx.strokeStyle = 'rgba(126,200,227,0.1)'; ctx.stroke();
   }
-
   // 스탯 다각형
   if (cls) {
     ctx.beginPath();
     for (var i = 0; i < axes; i++) {
-      var angle = angleStep * i - Math.PI / 2;
+      var a = angleStep * i - Math.PI / 2;
       var ratio = Math.min(1, vals[i] / maxVals[i]);
-      var x = cx + Math.cos(angle) * radius * ratio;
-      var y = cy + Math.sin(angle) * radius * ratio;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
+      var x = cx + Math.cos(a) * radius * ratio, y = cy + Math.sin(a) * radius * ratio;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     }
     ctx.closePath();
-    ctx.fillStyle = 'rgba(233,69,96,0.25)';
-    ctx.fill();
-    ctx.strokeStyle = '#e94560';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // 꼭짓점 점
+    ctx.fillStyle = 'rgba(233,69,96,0.25)'; ctx.fill();
+    ctx.strokeStyle = '#e94560'; ctx.lineWidth = 2; ctx.stroke();
+    // 꼭짓점
     for (var i = 0; i < axes; i++) {
-      var angle = angleStep * i - Math.PI / 2;
+      var a = angleStep * i - Math.PI / 2;
       var ratio = Math.min(1, vals[i] / maxVals[i]);
-      var x = cx + Math.cos(angle) * radius * ratio;
-      var y = cy + Math.sin(angle) * radius * ratio;
       ctx.fillStyle = labelColors[i];
       ctx.beginPath();
-      ctx.arc(x, y, 3, 0, Math.PI * 2);
+      ctx.arc(cx + Math.cos(a) * radius * ratio, cy + Math.sin(a) * radius * ratio, 3, 0, Math.PI * 2);
       ctx.fill();
     }
   }
-
-  // 라벨 + 수치
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
+  // 라벨
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (var i = 0; i < axes; i++) {
-    var angle = angleStep * i - Math.PI / 2;
-    var lx = cx + Math.cos(angle) * (radius + 18);
-    var ly = cy + Math.sin(angle) * (radius + 18);
-    ctx.fillStyle = labelColors[i];
-    ctx.font = 'bold 10px sans-serif';
+    var a = angleStep * i - Math.PI / 2;
+    var lx = cx + Math.cos(a) * (radius + 20), ly = cy + Math.sin(a) * (radius + 20);
+    ctx.fillStyle = labelColors[i]; ctx.font = 'bold 10px sans-serif';
     ctx.fillText(labels[i], lx, ly - 6);
-    ctx.fillStyle = '#fff';
-    ctx.font = '9px sans-serif';
+    ctx.fillStyle = '#fff'; ctx.font = '9px sans-serif';
     ctx.fillText(cls ? vals[i] : '-', lx, ly + 6);
   }
 }

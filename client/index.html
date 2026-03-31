@@ -33,55 +33,31 @@
     <button class="btn" id="startGameBtn" onclick="startGame()" disabled>시작!</button>
   </div>
 
-  <!-- 캐릭터 제작소 -->
+  <!-- 캐릭터 제작소: 랜덤 인생 -->
   <div id="workshop">
-    <h2 style="padding:12px 0 4px">캐릭터 제작</h2>
+    <h2 style="padding:12px 0 4px;text-align:center">🎲 랜덤 인생</h2>
     <div id="workshopBudget">
       <div class="gold-display">💰 <span id="goldDisplay">1000</span>G</div>
-      <div class="points-display">포인트: <span id="pointsDisplay">10</span></div>
+      <div class="reroll-display">🔄 리롤: <span id="rerollCount">10</span></div>
     </div>
 
-    <!-- 병과 선택 -->
-    <div class="shop-section">
-      <h3>병과 선택</h3>
-      <div class="item-grid" id="classGrid"></div>
-    </div>
-
-    <!-- 스탯 배분 + 레이더 차트 -->
-    <div class="shop-section">
-      <h3>스탯 배분 (10포인트)</h3>
-      <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
-        <div id="statSliders" style="flex:1;min-width:180px"></div>
-        <canvas id="statRadar" width="200" height="200" style="flex-shrink:0"></canvas>
+    <!-- 단계별 위저드 -->
+    <div class="shop-section" id="wizardStep">
+      <div id="wizardContent"></div>
+      <div id="wizardActions" style="display:flex;gap:10px;justify-content:center;margin-top:12px">
+        <button class="btn btn-secondary" id="rerollBtn" onclick="wizardReroll()">🔄 리롤</button>
+        <button class="btn" id="confirmBtn" onclick="wizardConfirm()">✅ 확정</button>
       </div>
+      <div id="wizardTimer" style="text-align:center;margin-top:8px;color:#e94560;font-weight:bold;font-size:1.2em"></div>
     </div>
 
-    <!-- 장비 상점 -->
-    <div class="shop-section">
-      <h3>투구</h3>
-      <div class="item-grid" id="helmetGrid"></div>
-    </div>
-    <div class="shop-section">
-      <h3>갑옷</h3>
-      <div class="item-grid" id="armorGrid"></div>
-    </div>
-    <div class="shop-section">
-      <h3>무기</h3>
-      <div class="item-grid" id="weaponGrid"></div>
-    </div>
-    <div class="shop-section">
-      <h3>신발</h3>
-      <div class="item-grid" id="bootsGrid"></div>
+    <!-- 레이더 차트 -->
+    <div class="shop-section" id="radarSection" style="display:none;text-align:center">
+      <canvas id="statRadar" width="220" height="220" style="margin:0 auto;display:block"></canvas>
     </div>
 
-    <!-- 스킬 선택 -->
-    <div class="shop-section">
-      <h3>스킬 선택 (4개 중 3개)</h3>
-      <div class="skill-select" id="skillSelect"></div>
-    </div>
-
-    <div id="workshopCta">
-      <button class="btn" id="submitBtn" onclick="submitBuild()" disabled style="width:100%;font-size:1.1em;padding:14px;font-weight:bold">빌드 제출</button>
+    <div id="workshopCta" style="display:none">
+      <button class="btn" id="submitBtn" onclick="submitBuild()" style="width:100%;font-size:1.1em;padding:14px;font-weight:bold">⚔️ 출전!</button>
     </div>
   </div>
 
