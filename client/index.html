@@ -2262,19 +2262,31 @@
           if (c && cIdx >= 0) {
             const { qvX, qvY } = serverToSurvivalQV(c.x, cIdx, aliveChars.length, survivalCanvas.width, survivalCanvas.height);
             survivalDeathAnims.set(evt.target, { born:performance.now(), duration:800 });
+            const killer = evt.killedBy ? survivalChars.find(ch => ch.id === evt.killedBy) : null;
+            if (c.isMonster) {
+              survivalLogAdd(`☠ ${c.name} 처치${killer ? ' by '+killer.name : ''}`);
+            }
             if (!c.isMonster) survivalNotify(`${c.name} 사망!`, '#e94560');
           }
         }
         if (evt.type === 'drop') {
           const slotNames = { helmet:'투구', armor:'갑옷', weapon:'무기', boots:'신발' };
           if (evt.dropType === 'enhancement') {
-            survivalNotify(`${slotNames[evt.slot] || evt.slot} +${evt.level} 강화!`, '#f0a500');
+            const msg = `🔨 ${slotNames[evt.slot]||evt.slot} +${evt.level} 강화!`;
+            survivalNotify(msg, '#f0a500');
+            survivalLogAdd(msg);
           } else if (evt.dropType === 'goldOverflow') {
-            survivalNotify(`+${evt.gold}G (${slotNames[evt.slot]} MAX)`, '#f0a500');
+            const msg = `💰 +${evt.gold}G (${slotNames[evt.slot]} MAX)`;
+            survivalNotify(msg, '#f0a500');
+            survivalLogAdd(msg);
           } else if (evt.dropType === 'goldEnhance') {
-            survivalNotify(`골드 강화: ${slotNames[evt.slot]} +${evt.level}`, '#7ec8e3');
+            const msg = `💰 골드 강화: ${slotNames[evt.slot]} +${evt.level}`;
+            survivalNotify(msg, '#7ec8e3');
+            survivalLogAdd(msg);
           } else if (evt.dropType === 'playerKill') {
-            survivalNotify(`⚔ ${evt.victimName} 처치! +${evt.gold}G${evt.stolenSlot ? ' +' + (slotNames[evt.stolenSlot]||evt.stolenSlot) + ' 탈취' : ''}`, '#ff4444');
+            const msg = `⚔ ${evt.victimName} 처치! +${evt.gold}G${evt.stolenSlot ? ' +' + (slotNames[evt.stolenSlot]||evt.stolenSlot) + ' 탈취' : ''}`;
+            survivalNotify(msg, '#ff4444');
+            survivalLogAdd(msg);
           }
         }
         if (evt.type === 'skill') {
@@ -2285,6 +2297,7 @@
         }
         if (evt.type === 'waveSpawn') {
           survivalNotify(`⚔ Wave 몬스터 출현!`, '#ff6644');
+          survivalLogAdd(`⚔ 몬스터 웨이브 출현! (${evt.count}마리)`);
         }
         if (evt.type === 'zoneMerge') {
           survivalNotify(`🔥 존 합류! Phase ${evt.phase}`, '#e94560');
