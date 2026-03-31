@@ -218,6 +218,62 @@
       display: block;
       touch-action: none;
     }
+    .survival-hp-bottom {
+      display: flex;
+      gap: 8px;
+      margin: 8px auto;
+      width: 100%;
+      max-width: 800px;
+      justify-content: space-between;
+    }
+    .survival-hp-card {
+      flex: 1;
+      background: #16213e;
+      border-radius: 6px;
+      padding: 6px 8px;
+      text-align: center;
+      min-width: 0;
+    }
+    .survival-hp-card .hp-name {
+      font-size: 0.8em;
+      font-weight: bold;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .survival-hp-card .hp-bar-outer {
+      background: #333;
+      border-radius: 3px;
+      height: 8px;
+      margin: 3px 0;
+      overflow: hidden;
+    }
+    .survival-hp-card .hp-bar-inner {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.15s;
+    }
+    .survival-hp-card .hp-info {
+      font-size: 0.7em;
+      color: #aaa;
+    }
+    .survival-hp-card.dead { opacity: 0.4; }
+    .survival-log {
+      width: 100%;
+      max-width: 800px;
+      max-height: 80px;
+      overflow-y: auto;
+      margin: 4px auto;
+      padding: 4px 8px;
+      background: rgba(22,33,62,0.6);
+      border-radius: 6px;
+      font-size: 0.75em;
+      color: #aaa;
+    }
+    .survival-log-entry {
+      padding: 1px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
     #survivalNotify {
       position: absolute;
       top: 8px;
@@ -495,8 +551,10 @@
       <canvas id="survival-canvas"></canvas>
       <div id="survivalNotify"></div>
     </div>
-    <div class="hp-bars" id="survivalHpBars"></div>
-    <div id="survivalTickInfo" style="margin:6px;color:#aaa;font-size:0.85em"></div>
+    <!-- HP바: 하단 4명 일렬 -->
+    <div id="survivalHpBars" class="survival-hp-bottom"></div>
+    <!-- 전투 로그 -->
+    <div id="survivalLog" class="survival-log"></div>
   </div>
 
   <!-- 결과 화면 -->
@@ -1564,6 +1622,10 @@
     const survivalDeathAnims = new Map();
     const ZONE_COLORS = ['#e94560','#7b2ff7','#2ecc71','#f39c12'];
     const ZONE_LABELS = ['A','B','C','D'];
+    // 카메라 시스템: 플레이어 캐릭터 중심 뷰포트
+    let cameraX = 0; // camera center in server coords (0~1600)
+    const CAMERA_SMOOTH = 0.1; // lerp factor
+    const MAP_WIDTH = 1600;
 
     function resizeSurvivalCanvas() {
       if (!survivalCanvas) return;
@@ -1654,8 +1716,11 @@
 
     function serverToSurvivalQV(serverX, charIdx, totalChars, W, H) {
       const { cx, cy, dw, dh } = getSurvivalDiamond(W, H);
-      // Normalize X from server coords (1600px wide map)
-      const normX = (serverX / 1600) * 2 - 1;
+      // Camera viewport: show ~800px of the 1600px map centered on cameraX
+      const viewLeft = cameraX - 400;
+      const viewRight = cameraX + 400;
+      const viewX = serverX - viewLeft; // position relative to viewport
+      const normX = (viewX / 800) * 2 - 1;
       // Derive stable Y from character index
       const normY = totalChars > 1 ? ((charIdx / (totalChars - 1)) * 2 - 1) * 0.6 : 0;
       // Isometric projection
@@ -1671,8 +1736,37 @@
       const now = performance.now();
       const isMobile = W < 400;
 
+      // Update camera: follow player p0
+      const playerChar = survivalChars.find(c => c.id === 'p0');
+      if (playerChar) {
+        const targetCam = Math.max(400, Math.min(MAP_WIDTH - 400, playerChar.x));
+        cameraX += (targetCam - cameraX) * CAMERA_SMOOTH;
+      }
+
       sCtx.clearRect(0, 0, W, H);
       drawSurvivalField(W, H);
+
+      // Draw walls on the diamond
+      const dropsWalls = [{ x: 550 }, { x: 1050 }];
+      for (const wall of dropsWalls) {
+        const wViewX = wall.x - (cameraX - 400);
+        const wScreenX = (wViewX / 800) * W;
+        if (wScreenX > 0 && wScreenX < W) {
+          sCtx.strokeStyle = 'rgba(233,69,96,0.6)';
+          sCtx.lineWidth = 3;
+          sCtx.setLineDash([8, 4]);
+          sCtx.beginPath();
+          sCtx.moveTo(wScreenX, H * 0.15);
+          sCtx.lineTo(wScreenX, H * 0.85);
+          sCtx.stroke();
+          sCtx.setLineDash([]);
+          // Wall label
+          sCtx.fillStyle = 'rgba(233,69,96,0.5)';
+          sCtx.font = `bold ${Math.round(W * 0.02)}px sans-serif`;
+          sCtx.textAlign = 'center';
+          sCtx.fillText('🧱', wScreenX, H * 0.12);
+        }
+      }
 
       // Sort and draw characters
       const chars = survivalChars.filter(c => c.alive || survivalDeathAnims.has(c.id));
@@ -1700,6 +1794,42 @@
         } else {
           drawCharacter(sCtx, char, qvX, qvY, scale, deathProgress);
         }
+      }
+
+      // Minimap (top-left corner)
+      const mmW = W * 0.2;
+      const mmH = H * 0.12;
+      const mmX = 6;
+      const mmY = 6;
+      sCtx.fillStyle = 'rgba(0,0,0,0.5)';
+      sCtx.fillRect(mmX, mmY, mmW, mmH);
+      sCtx.strokeStyle = 'rgba(255,255,255,0.3)';
+      sCtx.lineWidth = 1;
+      sCtx.strokeRect(mmX, mmY, mmW, mmH);
+      // Minimap walls
+      for (const wall of dropsWalls) {
+        const wx = mmX + (wall.x / MAP_WIDTH) * mmW;
+        sCtx.strokeStyle = 'rgba(233,69,96,0.5)';
+        sCtx.beginPath();
+        sCtx.moveTo(wx, mmY);
+        sCtx.lineTo(wx, mmY + mmH);
+        sCtx.stroke();
+      }
+      // Minimap viewport indicator
+      const vpLeft = mmX + ((cameraX - 400) / MAP_WIDTH) * mmW;
+      const vpW = (800 / MAP_WIDTH) * mmW;
+      sCtx.strokeStyle = 'rgba(255,255,255,0.5)';
+      sCtx.strokeRect(Math.max(mmX, vpLeft), mmY, Math.min(vpW, mmW), mmH);
+      // Minimap characters (dots)
+      for (const c of survivalChars) {
+        if (!c.alive) continue;
+        const dotX = mmX + (c.x / MAP_WIDTH) * mmW;
+        const dotY = mmY + mmH * 0.5;
+        sCtx.fillStyle = c.isMonster ? (c.isBoss ? '#ff0000' : '#ff8800') : (classColors[c.className] || '#fff');
+        const dotR = c.isMonster ? (c.isBoss ? 3 : 1.5) : 2.5;
+        sCtx.beginPath();
+        sCtx.arc(dotX, dotY, dotR, 0, Math.PI * 2);
+        sCtx.fill();
       }
 
       // Draw animations
@@ -1780,6 +1910,18 @@
       }
     }
 
+    function survivalLogAdd(text) {
+      const el = document.getElementById('survivalLog');
+      if (!el) return;
+      const entry = document.createElement('div');
+      entry.className = 'survival-log-entry';
+      entry.textContent = text;
+      el.appendChild(entry);
+      el.scrollTop = el.scrollHeight;
+      // Keep max 30 entries
+      while (el.children.length > 30) el.removeChild(el.firstChild);
+    }
+
     function survivalNotify(text, color) {
       const el = document.getElementById('survivalNotify');
       if (!el) return;
@@ -1831,17 +1973,20 @@
 
       if (data.tick) document.getElementById('survivalTickInfo').textContent = `틱: ${data.tick}`;
 
-      // HP bars
+      // HP bars: 하단 4명 카드 레이아웃
       const players = survivalChars.filter(c => !c.isMonster);
       const hpEl = document.getElementById('survivalHpBars');
       hpEl.innerHTML = players.map(c => {
         const pct = Math.max(0, c.hp / c.maxHP * 100);
         const color = c.alive ? (classColors[c.className] || '#e94560') : '#555';
-        const zone = c.zoneId != null ? ` [${ZONE_LABELS[c.zoneId]}]` : '';
-        return `<div class="hp-bar-container">
-          <div class="char-name" style="color:${color}">${esc(c.name)}${zone}</div>
-          <div class="hp-bar-bg"><div class="hp-bar-fill" style="width:${pct}%;background:${color}"></div></div>
-          <div class="hp-text">${c.hp}/${c.maxHP}</div>
+        const lives = c.livesRemaining != null ? c.livesRemaining : '?';
+        const chaos = (c.chaos || 0) > 0 ? `<span style="color:#ff4444;font-size:0.8em"> 🔥${c.chaos}</span>` : '';
+        const isMe = c.id === 'p0';
+        const border = isMe ? 'border:1px solid #e94560' : '';
+        return `<div class="survival-hp-card ${c.alive ? '' : 'dead'}" style="${border}">
+          <div class="hp-name" style="color:${color}">${esc(c.name)}${chaos}</div>
+          <div class="hp-bar-outer"><div class="hp-bar-inner" style="width:${pct}%;background:${color}"></div></div>
+          <div class="hp-info">${c.hp}/${c.maxHP} | ♥${lives}</div>
         </div>`;
       }).join('');
 
@@ -1888,18 +2033,23 @@
         }
         if (evt.type === 'bossSpawn') {
           survivalNotify(`🐉 최종보스 ${evt.name} 출현! HP:${evt.hp}`, '#ff0000');
+          survivalLogAdd(`🐉 최종보스 ${evt.name} 출현!`);
         }
         if (evt.type === 'bossKill') {
           survivalNotify(`👑 ${evt.killerName}이(가) 보스를 처치! 승리!`, '#ffd700');
+          survivalLogAdd(`👑 ${evt.killerName} 보스 처치! 승리!`);
         }
         if (evt.type === 'respawnQueued') {
-          survivalNotify(`💀 ${evt.playerName} 사망! ${evt.respawnIn}초 후 부활 (남은 목숨: ${evt.livesRemaining})`, '#ff8800');
+          survivalNotify(`💀 ${evt.playerName} 사망! ${evt.respawnIn}초 후 부활 (♥${evt.livesRemaining})`, '#ff8800');
+          survivalLogAdd(`💀 ${evt.playerName} 사망 (♥${evt.livesRemaining})`);
         }
         if (evt.type === 'respawn') {
-          survivalNotify(`✨ ${evt.playerName} 부활! (남은 목숨: ${evt.livesRemaining})`, '#2ecc71');
+          survivalNotify(`✨ ${evt.playerName} 부활! (♥${evt.livesRemaining})`, '#2ecc71');
+          survivalLogAdd(`✨ ${evt.playerName} 부활`);
         }
         if (evt.type === 'wallBreak') {
           survivalNotify(`🧱 ${evt.label} 붕괴! 새로운 영역 개방!`, '#e94560');
+          survivalLogAdd(`🧱 ${evt.label} 붕괴!`);
         }
       }
     });
