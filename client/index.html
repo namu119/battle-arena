@@ -581,6 +581,7 @@
         <div style="color:#7ec8e3;font-size:0.9em" id="survivalEnhance">🔨 투구0/갑옷0/무기0/신발0</div>
       </div>
     </div>
+    <div id="survivalTickInfo" style="color:#aaa;font-size:0.75em;margin:2px"></div>
     <div style="position:relative;width:100%;max-width:800px">
       <canvas id="survival-canvas"></canvas>
       <div id="survivalNotify"></div>
@@ -1984,7 +1985,8 @@
       survivalPhase = 1;
       survivalActiveZones = [0,1,2,3];
       isSurvivalActive = true;
-      document.getElementById('survivalTickInfo').textContent = `총 ${totalTicks}틱`;
+      const sti = document.getElementById('survivalTickInfo');
+      if (sti) sti.textContent = `총 ${totalTicks}틱`;
       survivalAnimFrameId = requestAnimationFrame(survivalAnimLoop);
     });
 
@@ -2010,7 +2012,7 @@
       const phaseLabels = { 1: 'Phase 1 - PvE', 2: 'Phase 2 - 합류', 3: 'Phase 3 - FFA' };
       document.getElementById('survivalPhase').textContent = phaseLabels[survivalPhase] || '';
 
-      if (data.tick) document.getElementById('survivalTickInfo').textContent = `틱: ${data.tick}`;
+      if (data.tick) { const sti2 = document.getElementById('survivalTickInfo'); if (sti2) sti2.textContent = `틱: ${data.tick}`; }
 
       // HP bars: 하단 4명 카드 레이아웃
       const players = survivalChars.filter(c => !c.isMonster);
