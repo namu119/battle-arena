@@ -191,8 +191,21 @@
       flex-direction: column;
       align-items: center;
       justify-content: flex-start;
-      padding: 20px;
-      padding-top: 10px;
+      padding: 12px;
+      padding-top: 8px;
+    }
+    #survivalHud {
+      width: 100%;
+      max-width: 800px;
+      margin-bottom: 6px;
+    }
+    .survival-hud-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin: 2px 0;
+      flex-wrap: wrap;
     }
     #survival-canvas {
       background: #0f3460;
@@ -205,20 +218,31 @@
       display: block;
       touch-action: none;
     }
+    #survivalNotify {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      z-index: 10;
+      pointer-events: none;
+      max-width: 200px;
+    }
     .survival-notify-item {
-      background: rgba(15,52,96,0.9);
+      background: rgba(15,52,96,0.95);
       border: 1px solid #7ec8e3;
       border-radius: 6px;
-      padding: 6px 12px;
-      margin-bottom: 4px;
-      font-size: 0.85em;
+      padding: 5px 10px;
+      margin-bottom: 3px;
+      font-size: 0.8em;
       color: #7ec8e3;
-      animation: fadeInOut 2s forwards;
+      animation: fadeInOut 2.5s forwards;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     @keyframes fadeInOut {
-      0% { opacity: 0; transform: translateX(20px); }
-      15% { opacity: 1; transform: translateX(0); }
-      70% { opacity: 1; }
+      0% { opacity: 0; transform: translateY(-8px); }
+      10% { opacity: 1; transform: translateY(0); }
+      75% { opacity: 1; }
       100% { opacity: 0; }
     }
 
@@ -264,7 +288,8 @@
       .result-card { min-width: 240px; padding: 12px 20px; }
       .shop-section { width: 97%; }
       #survival-screen { padding: 12px; }
-      #survivalHud { gap: 10px !important; }
+      .survival-hud-row { gap: 10px; }
+      #survivalNotify { max-width: 180px; }
     }
 
     /* ── 모바일 (max-width: 600px) ── */
@@ -322,15 +347,13 @@
       .player-list { min-width: 0; width: 100%; }
 
       /* 서바이벌 모바일 */
-      #survival-screen { padding: 8px; padding-top: 12px; }
+      #survival-screen { padding: 6px; padding-top: 8px; }
 
-      #survivalHud {
-        gap: 8px !important;
-        margin: 6px !important;
+      .survival-hud-row {
+        gap: 8px;
         font-size: 0.85em;
       }
-      #survivalHud > div { font-size: 0.9em !important; }
-      #survivalHud > button { padding: 4px 10px !important; font-size: 12px !important; min-height: 36px !important; }
+      .survival-hud-row > div { font-size: 0.85em !important; }
 
       #survival-canvas {
         border-width: 1px;
@@ -338,14 +361,13 @@
       }
 
       #survivalNotify {
-        top: 8px !important;
-        right: 8px !important;
-        left: 8px;
-        max-width: none;
+        max-width: 45%;
+        right: 4px;
+        top: 4px;
       }
       .survival-notify-item {
-        font-size: 0.75em;
-        padding: 4px 8px;
+        font-size: 0.7em;
+        padding: 3px 6px;
       }
 
       /* 배속 버튼 모바일 */
@@ -458,17 +480,23 @@
 
   <!-- 서바이벌 전투 화면 -->
   <div id="survival-screen">
-    <div id="survivalHud" style="display:flex;gap:15px;margin:10px;flex-wrap:wrap;align-items:center;justify-content:center;max-width:820px">
-      <div style="color:#e94560;font-weight:bold;font-size:1.2em" id="survivalTimer">5:00</div>
-      <div style="color:#f0a500" id="survivalPhase">Phase 1 - PvE</div>
-      <div style="color:#f0a500" id="survivalGold">💰 0G</div>
-      <div style="color:#7ec8e3;font-size:0.9em" id="survivalEnhance">🔨 0/0/0/0</div>
-      <button class="btn btn-secondary" id="survivalSpeedBtn" style="padding:6px 12px;font-size:13px;min-height:32px">1x</button>
+    <div id="survivalHud">
+      <div class="survival-hud-row">
+        <div style="color:#e94560;font-weight:bold;font-size:1.2em" id="survivalTimer">5:00</div>
+        <div style="color:#f0a500;font-weight:bold" id="survivalPhase">Phase 1 - PvE</div>
+        <button class="btn btn-secondary" id="survivalSpeedBtn" style="padding:4px 10px;font-size:13px;min-height:30px">1x</button>
+      </div>
+      <div class="survival-hud-row">
+        <div style="color:#f0a500" id="survivalGold">💰 0G</div>
+        <div style="color:#7ec8e3;font-size:0.9em" id="survivalEnhance">🔨 투구0/갑옷0/무기0/신발0</div>
+      </div>
     </div>
-    <div id="survivalNotify" style="position:fixed;top:60px;right:20px;z-index:100"></div>
-    <canvas id="survival-canvas"></canvas>
+    <div style="position:relative;width:100%;max-width:800px">
+      <canvas id="survival-canvas"></canvas>
+      <div id="survivalNotify"></div>
+    </div>
     <div class="hp-bars" id="survivalHpBars"></div>
-    <div id="survivalTickInfo" style="margin:10px;color:#aaa"></div>
+    <div id="survivalTickInfo" style="margin:6px;color:#aaa;font-size:0.85em"></div>
   </div>
 
   <!-- 결과 화면 -->
@@ -1766,7 +1794,7 @@
       if (player) {
         document.getElementById('survivalGold').textContent = `💰 ${player.gold || 0}G`;
         const enh = player.enhancementLevels;
-        if (enh) document.getElementById('survivalEnhance').textContent = `🔨 ${enh.helmet}/${enh.armor}/${enh.weapon}/${enh.boots}`;
+        if (enh) document.getElementById('survivalEnhance').textContent = `🔨 투구${enh.helmet}/갑옷${enh.armor}/무기${enh.weapon}/신발${enh.boots}`;
       }
 
       const elapsed = (data.tick || 0) * 0.2;
