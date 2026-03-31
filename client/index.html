@@ -47,10 +47,13 @@
       <div class="item-grid" id="classGrid"></div>
     </div>
 
-    <!-- 스탯 배분 -->
+    <!-- 스탯 배분 + 레이더 차트 -->
     <div class="shop-section">
       <h3>스탯 배분 (10포인트)</h3>
-      <div id="statSliders"></div>
+      <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
+        <div id="statSliders" style="flex:1;min-width:180px"></div>
+        <canvas id="statRadar" width="200" height="200" style="flex-shrink:0"></canvas>
+      </div>
     </div>
 
     <!-- 장비 상점 -->
