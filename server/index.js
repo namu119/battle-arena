@@ -1,5 +1,7 @@
 const express = require('express');
 const http = require('http');
+const https = require('https');
+const fs = require('fs');
 const { Server } = require('socket.io');
 const path = require('path');
 const { BattleEngine, TICK_INTERVAL } = require('./BattleEngine');
@@ -11,7 +13,24 @@ const equipments = require('../data/equipments.json');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+
+// HTTPS 서버 (자체 서명 인증서)
+let httpsServer = null;
+const certPath = path.join(__dirname, '../certs');
+try {
+  if (fs.existsSync(path.join(certPath, 'key.pem'))) {
+    httpsServer = https.createServer({
+      key: fs.readFileSync(path.join(certPath, 'key.pem')),
+      cert: fs.readFileSync(path.join(certPath, 'cert.pem')),
+    }, app);
+  }
+} catch (e) {
+  console.log('HTTPS 인증서 없음, HTTP만 실행');
+}
+
+const io = new Server(server, { cors: { origin: '*' } });
+// HTTPS 서버에도 Socket.IO 붙이기
+if (httpsServer) io.attach(httpsServer);
 
 // ─── AI 빌드 랜덤 생성 ───
 const AI_NAMES = ['철수봇', '영희봇', '민수봇', '지은봇', '현우봇', '수진봇'];
@@ -331,6 +350,14 @@ function startBattle(room) {
 }
 
 const PORT = process.env.PORT || 3456;
+const HTTPS_PORT = process.env.HTTPS_PORT || 3457;
+
 server.listen(PORT, () => {
   console.log(`Battle Arena 서버 시작: http://localhost:${PORT}`);
 });
+
+if (httpsServer) {
+  httpsServer.listen(HTTPS_PORT, () => {
+    console.log(`HTTPS 서버 시작: https://localhost:${HTTPS_PORT}`);
+  });
+}
