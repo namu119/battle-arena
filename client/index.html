@@ -17,7 +17,7 @@
     }
 
     /* 화면 컨테이너 */
-    #lobby, #workshop, #battle-screen, #result-screen {
+    #lobby, #workshop, #battle-screen, #result-screen, #survival-screen {
       display: none;
       width: 100%;
       min-height: 100vh;
@@ -26,6 +26,7 @@
       justify-content: flex-start;
       padding-top: 40px;
       padding-bottom: 40px;
+      box-sizing: border-box;
     }
     .active { display: flex !important; }
 
@@ -261,19 +262,13 @@
 
     /* 서바이벌 */
     #survival-screen {
-      display: none;
-      width: 100%;
-      min-height: 100vh;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
       padding: 12px;
       padding-top: 8px;
     }
     #survivalHud {
       width: 100%;
       max-width: 800px;
-      margin-bottom: 6px;
+      margin: 0 auto 6px;
     }
     .survival-hud-row {
       display: flex;
@@ -283,6 +278,10 @@
       margin: 2px 0;
       flex-wrap: wrap;
     }
+    .survival-timer { color: #e94560; font-weight: bold; font-size: 1.2em; }
+    .survival-phase { color: #f0a500; font-weight: bold; font-size: 1em; }
+    .survival-gold { color: #f0a500; font-size: 1em; }
+    .survival-tick-info { color: #aaa; font-size: 0.75em; margin: 2px auto; text-align: center; width: 100%; max-width: 800px; }
     #survival-canvas {
       background: #0f3460;
       border: 2px solid #e94560;
@@ -522,7 +521,9 @@
         font-size: 0.82em;
         padding: 0 4px;
       }
-      .survival-hud-row > div { font-size: 0.82em !important; }
+      .survival-timer { font-size: 1em; }
+      .survival-phase { font-size: 0.82em; }
+      .survival-gold { font-size: 0.82em; }
       .enhance-badges { gap: 3px; }
       .enhance-badge { font-size: 0.68em; padding: 2px 4px; }
 
@@ -669,7 +670,7 @@
   <div id="lobby">
     <h1>Battle Arena</h1>
     <input id="playerName" placeholder="닉네임" maxlength="10" value="">
-    <div style="margin: 15px">
+    <div style="margin:15px auto;display:flex;flex-wrap:wrap;gap:8px;justify-content:center;width:100%;max-width:400px">
       <button class="btn" onclick="createRoom()">방 만들기</button>
       <button class="btn btn-secondary" onclick="refreshRooms()">방 목록</button>
       <button class="btn" onclick="soloMode()" style="background:#0f3460;border:1px solid #7ec8e3">혼자 연습 (vs AI)</button>
@@ -740,19 +741,19 @@
     </div>
     <div class="hp-bars" id="hpBars"></div>
     <canvas id="battle-canvas"></canvas>
-    <div id="tickInfo" style="margin:10px;color:#aaa"></div>
+    <div id="tickInfo" style="margin:10px auto;color:#aaa;width:100%;max-width:800px;text-align:center"></div>
   </div>
 
   <!-- 서바이벌 전투 화면 -->
   <div id="survival-screen">
     <div id="survivalHud">
       <div class="survival-hud-row">
-        <div style="color:#e94560;font-weight:bold;font-size:1.2em" id="survivalTimer">5:00</div>
-        <div style="color:#f0a500;font-weight:bold" id="survivalPhase">Phase 1 - PvE</div>
+        <div class="survival-timer" id="survivalTimer">5:00</div>
+        <div class="survival-phase" id="survivalPhase">Phase 1 - PvE</div>
         <button class="btn btn-secondary" id="survivalSpeedBtn" style="padding:6px 12px;font-size:13px">1x</button>
       </div>
       <div class="survival-hud-row">
-        <div style="color:#f0a500" id="survivalGold">💰 0G</div>
+        <div class="survival-gold" id="survivalGold">💰 0G</div>
         <div id="survivalEnhance" class="enhance-badges">
           <span class="enhance-badge" id="enh-helmet">투구0</span>
           <span class="enhance-badge" id="enh-armor">갑옷0</span>
@@ -761,7 +762,7 @@
         </div>
       </div>
     </div>
-    <div id="survivalTickInfo" style="color:#aaa;font-size:0.75em;margin:2px"></div>
+    <div id="survivalTickInfo" class="survival-tick-info"></div>
     <div style="position:relative;width:100%;max-width:800px">
       <canvas id="survival-canvas"></canvas>
       <div id="survivalNotify"></div>
