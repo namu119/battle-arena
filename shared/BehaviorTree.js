@@ -131,65 +131,98 @@ class BehaviorTree {
   executeAttack(enemies) {
     if (enemies.length === 0) return null;
 
-    // 위협 평가 + PvE 우선
     const myPower = (this.char.stats?.ATK || 0) + (this.char.stats?.DEF || 0);
+    const myHpRatio = this.char.hp / (this.char.stats?.maxHP || 1);
+    const myEnhance = this.char.enhancementLevels
+      ? Object.values(this.char.enhancementLevels).reduce((a, b) => a + b, 0) : 0;
+
     const monsters = enemies.filter(e => e.isMonster && !e.isBoss);
     const bosses = enemies.filter(e => e.isBoss);
     const players = enemies.filter(e => !e.isMonster);
 
-    // 안전한 적: 전투력 2배 미만
+    // 안전한 몬스터: 전투력 2배 미만
     const safeMonsters = monsters.filter(e => {
       const ePower = (e.stats?.ATK || 0) + (e.stats?.DEF || 0);
       return ePower < myPower * 2;
     });
-    const dangerousMonsters = monsters.filter(e => {
-      const ePower = (e.stats?.ATK || 0) + (e.stats?.DEF || 0);
-      return ePower >= myPower * 2;
-    });
 
-    // 카오스 기반 PvP 판단
-    const myChaos = this.char.chaos || 0;
-    const myHpRatio = this.char.hp / (this.char.stats?.maxHP || 1);
+    // ─── 전략 판단: PvP 준비가 됐는가? ───
+    // 강화 3레벨 이상 + HP 60% 이상이면 PvP 준비 완료
+    const pvpReady = myEnhance >= 3 && myHpRatio > 0.6;
+    // 강화 6레벨 이상이면 적극적 PvP
+    const pvpAggressive = myEnhance >= 6 && myHpRatio > 0.4;
 
-    // 플레이어 필터: 강한 적 회피, 약한 적 공격
-    const filteredPlayers = players.filter(e => {
+    // 플레이어 위협 평가
+    const evaluatedPlayers = players.map(e => {
       const ePower = (e.stats?.ATK || 0) + (e.stats?.DEF || 0);
       const eHpRatio = (e.hp || 0) / (e.stats?.maxHP || 1);
-      // 상대가 훨씬 강하면 70% 확률로 회피
-      if (ePower > myPower * 1.5 && Math.random() < 0.7) return false;
-      // 내 HP 낮고 상대 HP 높으면 60% 확률로 회피
-      if (eHpRatio > 0.7 && myHpRatio < 0.4 && Math.random() < 0.6) return false;
-      return true;
+      const eEnhance = e.enhancementLevels
+        ? Object.values(e.enhancementLevels).reduce((a, b) => a + b, 0) : 0;
+      const eChaos = e.chaos || 0;
+      // 전투력 점수: 스탯 + 강화 + HP비율
+      const myScore = myPower + myEnhance * 5 + myHpRatio * 20;
+      const eScore = ePower + eEnhance * 5 + eHpRatio * 20;
+      const winChance = myScore / (myScore + eScore + 1);
+      return { ...e, winChance, eChaos, eScore };
     });
 
-    // 킬러 견제: 카오스 30+ = 1킬러, 60+ = 학살자
-    const killers = filteredPlayers.filter(e => (e.chaos || 0) >= 30);
+    // 싸울만한 플레이어: 승률 40% 이상
+    const fightablePlayers = evaluatedPlayers.filter(e => e.winChance > 0.4);
+    // 약한 플레이어: 승률 60% 이상 (확실한 킬)
+    const weakPlayers = evaluatedPlayers.filter(e => e.winChance > 0.6);
+    // 킬러 견제
+    const killers = evaluatedPlayers.filter(e => e.eChaos >= 30);
 
-    // 우선순위: 몬스터 파밍 → 보스 → 킬러 견제 → 먼 몬스터 → 약한 플레이어
+    // ─── 행동 우선순위 ───
     const nearbyMonsters = safeMonsters.filter(e => this.getDistance(e) <= this.char.range * 3);
-    let targetPool;
+    let targetPool = null;
+    let action = null;
+
+    // 1) 근처 몬스터가 있으면 항상 파밍 (최우선)
     if (nearbyMonsters.length > 0) {
       targetPool = nearbyMonsters;
-    } else if (bosses.length > 0) {
+    }
+    // 2) 보스 존재 → 보스 공격 (라스트히트)
+    else if (bosses.length > 0) {
       targetPool = bosses;
-    } else if (killers.length > 0 && Math.random() < 0.6) {
-      targetPool = killers; // 60% 확률로 킬러 집중 공격
-    } else if (safeMonsters.length > 0) {
+    }
+    // 3) PvP 미준비 + 먼 몬스터 있음 → 몬스터 찾아 이동
+    else if (!pvpReady && safeMonsters.length > 0) {
       targetPool = safeMonsters;
-    } else if (filteredPlayers.length > 0) {
-      targetPool = filteredPlayers;
-    } else {
-      targetPool = enemies.length > 0 ? enemies : [];
+    }
+    // 4) PvP 미준비 + 몬스터 없음 → 후퇴 (스폰쪽으로 대기)
+    else if (!pvpReady && players.length > 0) {
+      action = { type: 'move', direction: 'retreat' };
+    }
+    // 5) PvP 준비됨 + 킬러 있음 → 견제 (70%)
+    else if (pvpReady && killers.length > 0 && Math.random() < 0.7) {
+      targetPool = killers;
+    }
+    // 6) PvP 적극적 + 약한 적 → 확실한 킬
+    else if (pvpAggressive && weakPlayers.length > 0) {
+      targetPool = weakPlayers;
+    }
+    // 7) PvP 준비됨 + 싸울만한 적 → 조심스럽게 교전
+    else if (pvpReady && fightablePlayers.length > 0) {
+      targetPool = fightablePlayers;
+    }
+    // 8) HP 낮으면 후퇴
+    else if (myHpRatio < 0.3 && players.length > 0) {
+      action = { type: 'move', direction: 'retreat' };
+    }
+    // 9) 아무것도 없으면 대기
+    else {
+      targetPool = enemies.length > 0 ? enemies : null;
     }
 
-    if (targetPool.length === 0) return null;
+    if (action) return action;
+    if (!targetPool || targetPool.length === 0) return null;
 
     const inRange = targetPool.filter(e => this.getDistance(e) <= this.char.range);
     if (inRange.length > 0) {
       const boss = inRange.find(e => e.isBoss);
       if (boss) return { type: 'attack', target: boss.id };
-      const killer = inRange.find(e => (e.chaos || 0) >= 30);
-      const target = killer || this.getWeakestEnemy(inRange);
+      const target = this.getWeakestEnemy(inRange);
       return { type: 'attack', target: target.id };
     }
 
