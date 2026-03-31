@@ -276,7 +276,12 @@ function survivalNotify(text, color, isCharLog) {
 // ─── HP카드 탭 → 로그 필터 ───
 var hpBarsEl = document.getElementById('survivalHpBars');
 if (hpBarsEl) {
+  var lastToggleTime = 0;
   hpBarsEl.addEventListener('click', function(e) {
+    // 모바일 더블 이벤트 방지 (300ms 디바운스)
+    var now = Date.now();
+    if (now - lastToggleTime < 300) return;
+    lastToggleTime = now;
     var card = e.target.closest('.survival-hp-card');
     if (!card) return;
     var charId = card.dataset.charId;
