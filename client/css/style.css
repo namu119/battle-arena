@@ -1,0 +1,695 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #1a1a2e;
+  color: #e0e0e0;
+  font-family: 'Segoe UI', sans-serif;
+  overflow-x: hidden;
+}
+
+/* 화면 컨테이너 */
+#lobby, #workshop, #battle-screen, #result-screen, #survival-screen {
+  display: none;
+  width: 100%;
+  min-height: 100vh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 40px;
+  padding-bottom: 40px;
+  box-sizing: border-box;
+}
+.active { display: flex !important; }
+
+h1 { color: #e94560; margin-bottom: 20px; font-size: 2em; }
+h2 { color: #e94560; margin-bottom: 15px; }
+
+.btn {
+  background: #e94560;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer;
+  margin: 5px;
+  min-height: 44px;
+  transition: background 0.2s;
+}
+.btn:hover { background: #c73e54; }
+.btn:disabled { background: #555; cursor: not-allowed; }
+.btn-secondary { background: #16213e; border: 1px solid #e94560; }
+
+input {
+  background: #16213e;
+  border: 1px solid #444;
+  color: white;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 16px;
+  margin: 5px;
+  min-height: 44px;
+}
+
+/* 상점 */
+#workshop {
+  overflow-y: auto;
+  padding: 16px;
+  padding-top: 24px;
+}
+.shop-section {
+  background: #16213e;
+  border-radius: 10px;
+  padding: 12px;
+  margin: 6px auto;
+  width: 95%;
+  max-width: 800px;
+}
+.shop-section h3 {
+  color: #e94560;
+  margin-bottom: 8px;
+  font-size: 0.95em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.item-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.item-card {
+  background: #0f3460;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  flex: 1;
+  min-width: 140px;
+  transition: all 0.15s;
+}
+.item-card:hover { border-color: #e94560; background: #142952; }
+.item-card.selected {
+  border-color: #e94560;
+  background: #1a1a4e;
+  box-shadow: 0 0 0 1px #e94560, inset 0 0 12px rgba(233,69,96,0.15);
+}
+.item-name { font-weight: 700; color: #fff; font-size: 0.95em; }
+.item-cost { color: #f0a500; font-size: 0.82em; }
+.item-stats { color: #888; font-size: 0.78em; margin-top: 2px; }
+.item-skill { color: #7ec8e3; font-size: 0.78em; margin-top: 2px; }
+
+.stat-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 5px 0;
+}
+.stat-row label { width: 50px; font-weight: bold; }
+.stat-row input[type=range] { flex: 1; }
+.stat-row span { width: 30px; text-align: center; }
+
+#workshopBudget {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: #1a1a2e;
+  border-bottom: 1px solid #0f3460;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  padding: 8px 16px;
+  width: 100%;
+}
+.gold-display {
+  color: #f0a500;
+  font-size: 1.2em;
+  font-weight: bold;
+  margin: 0;
+}
+.points-display {
+  color: #7ec8e3;
+  font-size: 1em;
+  margin: 0;
+}
+.stat-val-badge {
+  display: inline-block;
+  background: #e94560;
+  color: #fff;
+  font-size: 0.95em;
+  font-weight: bold;
+  min-width: 28px;
+  text-align: center;
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+.skill-chip.selected {
+  border-color: #7ec8e3;
+  background: #1a1a4e;
+  box-shadow: 0 0 0 1px #7ec8e3;
+  color: #fff;
+}
+#workshopCta {
+  position: sticky;
+  bottom: 0;
+  background: linear-gradient(transparent, #1a1a2e 30%);
+  padding: 12px 16px 16px;
+  width: 100%;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+}
+#resultCards {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 800px;
+}
+.enhance-badges {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.enhance-badge {
+  background: #0f3460;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 0.75em;
+  color: #7ec8e3;
+  white-space: nowrap;
+}
+
+.skill-select {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.skill-chip {
+  background: #0f3460;
+  border: 2px solid transparent;
+  border-radius: 20px;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 0.9em;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+.skill-chip:hover { border-color: #7ec8e3; }
+.skill-chip.selected { border-color: #7ec8e3; background: #1a1a4e; }
+.skill-chip.disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* 전투 화면 */
+#battle-screen {
+  padding: 20px;
+  padding-top: 30px;
+}
+#battle-canvas {
+  background: #0f3460;
+  border: 2px solid #e94560;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 800px;
+  height: auto;
+  aspect-ratio: 2 / 1;
+  display: block;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.hp-bars {
+  display: flex;
+  gap: 15px;
+  margin: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  width: 100%;
+  max-width: 800px;
+}
+.hp-bar-container {
+  text-align: center;
+  min-width: 120px;
+}
+.hp-bar-bg {
+  background: #333;
+  border-radius: 4px;
+  height: 14px;
+  width: 120px;
+  overflow: hidden;
+}
+.hp-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.15s;
+}
+.hp-text { font-size: 0.8em; color: #aaa; }
+.char-name { font-size: 0.9em; font-weight: bold; }
+
+/* 서바이벌 */
+#survival-screen {
+  padding: 12px;
+  padding-top: 8px;
+}
+#survivalHud {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto 6px;
+}
+.survival-hud-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 2px 0;
+  flex-wrap: wrap;
+}
+.survival-timer { color: #e94560; font-weight: bold; font-size: 1.2em; }
+.survival-phase { color: #f0a500; font-weight: bold; font-size: 1em; }
+.survival-gold { color: #f0a500; font-size: 1em; }
+.survival-tick-info { color: #aaa; font-size: 0.75em; margin: 2px auto; text-align: center; width: 100%; max-width: 800px; }
+#survival-canvas {
+  background: #0f3460;
+  border: 2px solid #e94560;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 800px;
+  height: auto;
+  aspect-ratio: 2 / 1;
+  display: block;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.survival-hp-bottom {
+  display: flex;
+  gap: 8px;
+  margin: 8px auto;
+  width: 100%;
+  max-width: 800px;
+  justify-content: space-between;
+}
+.survival-hp-card {
+  flex: 1;
+  background: #16213e;
+  border-radius: 6px;
+  padding: 6px 8px;
+  text-align: center;
+  min-width: 0;
+}
+.survival-hp-card .hp-name {
+  font-size: 0.8em;
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.survival-hp-card .hp-bar-outer {
+  background: #333;
+  border-radius: 3px;
+  height: 8px;
+  margin: 3px 0;
+  overflow: hidden;
+}
+.survival-hp-card .hp-bar-inner {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.15s;
+}
+.survival-hp-card .hp-info {
+  font-size: 0.7em;
+  color: #aaa;
+}
+.survival-hp-card.dead { opacity: 0.4; }
+.survival-log-wrap {
+  width: 100%;
+  max-width: 800px;
+  margin: 4px auto 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 60px;
+}
+.log-filters {
+  display: flex;
+  gap: 4px;
+  padding: 4px 8px;
+  overflow-x: auto;
+}
+.log-filter-btn {
+  background: #16213e;
+  border: 1px solid #333;
+  color: #aaa;
+  border-radius: 12px;
+  padding: 3px 10px;
+  font-size: 0.72em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.log-filter-btn.active {
+  background: #e94560;
+  border-color: #e94560;
+  color: #fff;
+}
+.survival-log {
+  width: 100%;
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 10px;
+  background: rgba(22,33,62,0.85);
+  border-radius: 8px;
+  font-size: 0.82em;
+  color: #ccc;
+  border: 1px solid rgba(126,200,227,0.2);
+  line-height: 1.5;
+  max-height: 25vh;
+}
+.survival-hp-card { cursor: pointer; }
+.survival-hp-card:active { transform: scale(0.97); }
+.survival-hp-card.filter-active { border: 2px solid #e94560 !important; }
+.survival-log-entry {
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.survival-log-entry.highlight {
+  color: #fff;
+  background: rgba(233,69,96,0.1);
+  padding: 3px 4px;
+  border-radius: 3px;
+}
+#survivalNotify {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  pointer-events: none;
+  max-width: 200px;
+}
+.survival-notify-item {
+  background: rgba(15,52,96,0.95);
+  border: 1px solid #7ec8e3;
+  border-radius: 6px;
+  padding: 5px 10px;
+  margin-bottom: 3px;
+  font-size: 0.8em;
+  color: #7ec8e3;
+  animation: fadeInOut 2.5s forwards;
+  word-break: keep-all;
+}
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translateY(-8px); }
+  10% { opacity: 1; transform: translateY(0); }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* 결과 */
+.result-card {
+  background: #16213e;
+  border-radius: 12px;
+  padding: 15px 30px;
+  margin: 8px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  min-width: 300px;
+}
+.rank { font-size: 2em; font-weight: bold; }
+.rank-1 { color: #f0a500; }
+.rank-2 { color: #c0c0c0; }
+.rank-3 { color: #cd7f32; }
+.reward-gold { color: #f0a500; font-weight: bold; }
+
+.player-list {
+  background: #16213e;
+  border-radius: 8px;
+  padding: 10px 20px;
+  margin: 10px;
+  min-width: 200px;
+}
+.player-entry { padding: 5px 0; }
+.player-ready { color: #4caf50; }
+.player-waiting { color: #f0a500; }
+
+#loading-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: #1a1a2e; display: flex; align-items: center; justify-content: center;
+  z-index: 999; font-size: 1.5em; color: #e94560;
+}
+#loading-overlay.hidden { display: none; }
+
+/* ── 태블릿 (max-width: 900px) ── */
+@media (max-width: 900px) {
+  h1 { font-size: 1.7em; }
+  .item-card { min-width: 120px; }
+  .result-card { min-width: 240px; padding: 12px 20px; }
+  .shop-section { width: 97%; }
+  #survival-screen { padding: 12px; }
+  .survival-hud-row { gap: 10px; }
+  #survivalNotify { max-width: 180px; }
+}
+
+/* ── 모바일 (max-width: 600px) ── */
+@media (max-width: 600px) {
+  h1 { font-size: 1.4em; }
+  h2 { font-size: 1.2em; }
+
+  #lobby, #workshop, #battle-screen, #result-screen, #survival-screen {
+    padding-top: 16px;
+    padding-bottom: 16px;
+  }
+  #workshop { padding: 12px; padding-top: 20px; padding-bottom: 80px; }
+
+  .shop-section {
+    width: 100%;
+    margin: 6px 0;
+    padding: 12px;
+  }
+
+  .item-card {
+    min-width: 100%;
+    flex: none;
+  }
+
+  .item-name { font-size: 0.95em; }
+  .item-stats, .item-skill { font-size: 0.8em; }
+
+  .btn {
+    padding: 10px 16px;
+    font-size: 15px;
+  }
+
+  .gold-display { font-size: 1.1em; }
+  .points-display { font-size: 1em; }
+
+  .hp-bars {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+    padding: 0 4px;
+  }
+  .hp-bar-container { width: calc(50% - 6px); min-width: 0; }
+  .hp-bar-bg { width: 100%; }
+  .char-name { font-size: 0.78em; }
+  .hp-text { font-size: 0.68em; }
+
+  /* 스탯 슬라이더 터치 타겟 */
+  .stat-row { min-height: 44px; gap: 6px; }
+  .stat-row input[type=range] { height: 32px; accent-color: #e94560; }
+  .stat-val-badge { width: 32px; font-size: 0.9em; }
+
+  /* 패시브 설명 모바일: 선택 시만 표시 */
+  .passive-desc { display: none; }
+  .item-card.selected .passive-desc {
+    display: block;
+    font-size: 0.75em;
+    color: #999;
+    margin-top: 3px;
+  }
+
+  /* 닉네임 입력 */
+  #playerName { width: 80%; max-width: 280px; text-align: center; }
+
+  /* 알림 모바일 */
+  .survival-notify-item { font-size: 0.7em; padding: 3px 6px; }
+  #survivalNotify { max-width: 48%; right: 4px; top: 4px; }
+
+  /* 로그 축소 */
+  .survival-log { max-height: 48px; font-size: 0.7em; }
+
+  .result-card {
+    min-width: auto;
+    width: 90%;
+    padding: 12px 16px;
+  }
+
+  .stat-row label { width: 40px; font-size: 0.9em; }
+  .stat-row span { width: 24px; font-size: 0.9em; }
+
+  .skill-chip { font-size: 0.85em; padding: 5px 12px; }
+
+  .player-list { min-width: 0; width: 100%; }
+
+  /* ── 서바이벌 모바일 ── */
+  #survival-screen {
+    padding: 4px;
+    padding-top: 6px;
+    align-items: center;
+  }
+  #survivalHud {
+    width: 100%;
+    max-width: 100%;
+    margin-bottom: 4px;
+  }
+  .survival-hud-row {
+    gap: 6px;
+    font-size: 0.82em;
+    padding: 0 4px;
+  }
+  .survival-timer { font-size: 1em; }
+  .survival-phase { font-size: 0.82em; }
+  .survival-gold { font-size: 0.82em; }
+  .enhance-badges { gap: 3px; }
+  .enhance-badge { font-size: 0.68em; padding: 2px 4px; }
+
+  #survival-canvas {
+    border-width: 1px;
+    border-radius: 4px;
+    width: calc(100% - 4px);
+  }
+
+  #survivalNotify {
+    position: fixed !important;
+    max-width: 45%;
+    right: 4px;
+    top: 4px;
+    z-index: 50;
+  }
+  .survival-notify-item {
+    font-size: 0.7em;
+    padding: 3px 6px;
+  }
+
+  /* 서바이벌 HP카드 모바일 */
+  .survival-hp-bottom {
+    gap: 4px;
+    margin: 4px auto;
+    width: calc(100% - 8px);
+  }
+  .survival-hp-card {
+    padding: 5px 4px;
+    border-radius: 5px;
+  }
+  .survival-hp-card .hp-name { font-size: 0.72em; }
+  .survival-hp-card .hp-bar-outer { height: 7px; margin: 2px 0; }
+  .survival-hp-card .hp-info { font-size: 0.62em; }
+
+  /* 서바이벌 로그 모바일 */
+  .survival-log-wrap { min-height: 40px; }
+  .survival-log {
+    max-height: 20vh;
+    font-size: 0.72em;
+    padding: 4px 6px;
+  }
+  .log-filters { padding: 2px 4px; gap: 3px; }
+  .log-filter-btn { font-size: 0.65em; padding: 2px 8px; }
+
+  /* 서바이벌 틱 */
+  #survivalTickInfo { font-size: 0.7em !important; text-align: center; }
+
+  /* ── 배속 버튼 모바일 ── */
+  #speedBtn, #survivalSpeedBtn {
+    padding: 5px 10px !important;
+    font-size: 12px !important;
+    min-height: 36px !important;
+    min-width: 44px !important;
+  }
+
+  /* ── 전투 화면 모바일 ── */
+  #battle-screen {
+    padding: 6px;
+    padding-top: 8px;
+    align-items: center;
+  }
+  #battle-screen > div:first-child { gap: 6px !important; margin: 6px auto !important; }
+  #battle-screen > div:first-child h2 { font-size: 1.05em; }
+  #battle-canvas { width: calc(100% - 4px); }
+
+  /* ── 로비 모바일 ── */
+  #lobby {
+    padding: 20px 12px;
+    align-items: center;
+  }
+  #lobby > div { flex-direction: column; align-items: center; gap: 8px; }
+  #lobby .btn { width: 85%; max-width: 300px; }
+  #lobby h1 { text-align: center; }
+
+  /* ── 결과 화면 모바일 ── */
+  #result-screen { padding: 12px 8px; align-items: center; }
+  .result-card { width: calc(100% - 16px) !important; margin: 4px 8px; }
+  .rank { font-size: 1.5em; }
+
+  /* ── 워크샵 예산바 모바일 ── */
+  #workshopBudget {
+    gap: 12px;
+    padding: 6px 12px;
+    font-size: 0.9em;
+  }
+  #workshopCta { padding: 10px 12px 14px; }
+}
+
+/* ── 초소형 모바일 (max-width: 380px) ── */
+@media (max-width: 380px) {
+  h1 { font-size: 1.2em; }
+  h2 { font-size: 1em; }
+  .btn { padding: 8px 12px; font-size: 14px; }
+  .item-card { padding: 8px; }
+  .item-name { font-size: 0.85em; }
+  .shop-section { padding: 10px; }
+
+  /* 서바이벌 HUD */
+  .survival-hud-row { gap: 4px; font-size: 0.75em; }
+  .enhance-badge { font-size: 0.6em; padding: 1px 3px; }
+
+  /* PvP HP바 */
+  .hp-bar-container { width: calc(50% - 4px); }
+  .char-name { font-size: 0.72em; }
+  .hp-text { font-size: 0.65em; }
+
+  /* 서바이벌 HP카드 */
+  .survival-hp-bottom { gap: 3px; }
+  .survival-hp-card { padding: 3px 4px; }
+  .survival-hp-card .hp-name { font-size: 0.65em; }
+  .survival-hp-card .hp-info { display: none; }
+  .survival-hp-card .hp-bar-outer { height: 5px; }
+
+  /* 로그: 초소형 */
+  .survival-log { max-height: 18vh; font-size: 0.63em; }
+  .log-filter-btn { font-size: 0.6em; padding: 2px 6px; }
+
+  /* 전투 */
+  #battle-screen > div:first-child { margin: 4px auto !important; gap: 4px !important; }
+
+  /* 로비 */
+  #lobby .btn { width: 90%; }
+  #lobby > div { gap: 6px; }
+
+  /* 워크샵 */
+  #workshopBudget { gap: 8px; padding: 5px 8px; }
+  #workshopCta { padding: 8px 8px 12px; }
+  .stat-row label { width: 32px; font-size: 0.8em; }
+
+  /* 결과 */
+  .result-card { padding: 10px 12px !important; }
+  .rank { font-size: 1.3em; }
+
+  /* 로딩 */
+  #loading-overlay { padding: 20px; text-align: center; }
+}
