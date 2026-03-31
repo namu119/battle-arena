@@ -506,41 +506,109 @@
 
       .player-list { min-width: 0; width: 100%; }
 
-      /* 서바이벌 모바일 */
-      #survival-screen { padding: 6px; padding-top: 8px; }
-
-      .survival-hud-row {
-        gap: 8px;
-        font-size: 0.85em;
+      /* ── 서바이벌 모바일 ── */
+      #survival-screen {
+        padding: 4px;
+        padding-top: 6px;
+        align-items: center;
       }
-      .survival-hud-row > div { font-size: 0.85em !important; }
+      #survivalHud {
+        width: 100%;
+        max-width: 100%;
+        margin-bottom: 4px;
+      }
+      .survival-hud-row {
+        gap: 6px;
+        font-size: 0.82em;
+        padding: 0 4px;
+      }
+      .survival-hud-row > div { font-size: 0.82em !important; }
+      .enhance-badges { gap: 3px; }
+      .enhance-badge { font-size: 0.68em; padding: 2px 4px; }
 
       #survival-canvas {
         border-width: 1px;
         border-radius: 4px;
+        width: calc(100% - 4px);
       }
 
       #survivalNotify {
+        position: fixed !important;
         max-width: 45%;
         right: 4px;
         top: 4px;
+        z-index: 50;
       }
       .survival-notify-item {
         font-size: 0.7em;
         padding: 3px 6px;
       }
 
-      /* 배속 버튼 모바일 */
-      #speedBtn { padding: 4px 10px !important; font-size: 12px !important; min-height: 36px !important; }
+      /* 서바이벌 HP카드 모바일 */
+      .survival-hp-bottom {
+        gap: 4px;
+        margin: 4px auto;
+        width: calc(100% - 8px);
+      }
+      .survival-hp-card {
+        padding: 5px 4px;
+        border-radius: 5px;
+      }
+      .survival-hp-card .hp-name { font-size: 0.72em; }
+      .survival-hp-card .hp-bar-outer { height: 7px; margin: 2px 0; }
+      .survival-hp-card .hp-info { font-size: 0.62em; }
 
-      /* 전투 화면 모바일 */
-      #battle-screen { padding: 8px; padding-top: 12px; }
-      #battle-screen > div:first-child { gap: 8px !important; }
-      #battle-screen > div:first-child h2 { font-size: 1.1em; }
+      /* 서바이벌 로그 모바일 */
+      .survival-log {
+        max-height: 40px;
+        font-size: 0.68em;
+        width: calc(100% - 8px);
+        margin: 2px auto;
+        padding: 3px 6px;
+      }
 
-      /* 로비 버튼 모바일 스택 */
-      #lobby > div { flex-direction: column; align-items: center; }
-      #lobby .btn { width: 80%; max-width: 280px; }
+      /* 서바이벌 틱 */
+      #survivalTickInfo { font-size: 0.7em !important; text-align: center; }
+
+      /* ── 배속 버튼 모바일 ── */
+      #speedBtn, #survivalSpeedBtn {
+        padding: 5px 10px !important;
+        font-size: 12px !important;
+        min-height: 36px !important;
+        min-width: 44px !important;
+      }
+
+      /* ── 전투 화면 모바일 ── */
+      #battle-screen {
+        padding: 6px;
+        padding-top: 8px;
+        align-items: center;
+      }
+      #battle-screen > div:first-child { gap: 6px !important; margin: 6px auto !important; }
+      #battle-screen > div:first-child h2 { font-size: 1.05em; }
+      #battle-canvas { width: calc(100% - 4px); }
+
+      /* ── 로비 모바일 ── */
+      #lobby {
+        padding: 20px 12px;
+        align-items: center;
+      }
+      #lobby > div { flex-direction: column; align-items: center; gap: 8px; }
+      #lobby .btn { width: 85%; max-width: 300px; }
+      #lobby h1 { text-align: center; }
+
+      /* ── 결과 화면 모바일 ── */
+      #result-screen { padding: 12px 8px; align-items: center; }
+      .result-card { width: calc(100% - 16px) !important; margin: 4px 8px; }
+      .rank { font-size: 1.5em; }
+
+      /* ── 워크샵 예산바 모바일 ── */
+      #workshopBudget {
+        gap: 12px;
+        padding: 6px 12px;
+        font-size: 0.9em;
+      }
+      #workshopCta { padding: 10px 12px 14px; }
     }
 
     /* ── 초소형 모바일 (max-width: 380px) ── */
@@ -551,20 +619,42 @@
       .item-card { padding: 8px; }
       .item-name { font-size: 0.85em; }
       .shop-section { padding: 10px; }
-      .survival-hud-row { gap: 6px; font-size: 0.8em; }
+
+      /* 서바이벌 HUD */
+      .survival-hud-row { gap: 4px; font-size: 0.75em; }
+      .enhance-badge { font-size: 0.6em; padding: 1px 3px; }
+
+      /* PvP HP바 */
       .hp-bar-container { width: calc(50% - 4px); }
       .char-name { font-size: 0.72em; }
       .hp-text { font-size: 0.65em; }
-      /* HP 카드 초소형 */
-      .survival-hp-bottom { gap: 4px; }
-      .survival-hp-card { padding: 4px 5px; }
-      .survival-hp-card .hp-name { font-size: 0.7em; }
-      .survival-hp-card .hp-info { font-size: 0.6em; }
-      .survival-hp-card .hp-bar-outer { height: 6px; }
+
+      /* 서바이벌 HP카드 */
+      .survival-hp-bottom { gap: 3px; }
+      .survival-hp-card { padding: 3px 4px; }
+      .survival-hp-card .hp-name { font-size: 0.65em; }
+      .survival-hp-card .hp-info { display: none; }
+      .survival-hp-card .hp-bar-outer { height: 5px; }
+
       /* 로그 숨김 */
       .survival-log { display: none; }
-      /* 전투 헤더 */
-      #battle-screen > div:first-child { margin: 6px 4px !important; gap: 6px !important; }
+
+      /* 전투 */
+      #battle-screen > div:first-child { margin: 4px auto !important; gap: 4px !important; }
+
+      /* 로비 */
+      #lobby .btn { width: 90%; }
+      #lobby > div { gap: 6px; }
+
+      /* 워크샵 */
+      #workshopBudget { gap: 8px; padding: 5px 8px; }
+      #workshopCta { padding: 8px 8px 12px; }
+      .stat-row label { width: 32px; font-size: 0.8em; }
+
+      /* 결과 */
+      .result-card { padding: 10px 12px !important; }
+      .rank { font-size: 1.3em; }
+
       /* 로딩 */
       #loading-overlay { padding: 20px; text-align: center; }
     }
