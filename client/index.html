@@ -383,8 +383,11 @@
       color: #ccc;
       border: 1px solid rgba(126,200,227,0.2);
       line-height: 1.5;
-      max-height: 180px;
+      max-height: 25vh;
     }
+    .survival-hp-card { cursor: pointer; }
+    .survival-hp-card:active { transform: scale(0.97); }
+    .survival-hp-card.filter-active { border: 2px solid #e94560 !important; }
     .survival-log-entry {
       padding: 2px 0;
       border-bottom: 1px solid rgba(255,255,255,0.06);
@@ -606,7 +609,7 @@
       /* 서바이벌 로그 모바일 */
       .survival-log-wrap { min-height: 40px; }
       .survival-log {
-        max-height: 100px;
+        max-height: 20vh;
         font-size: 0.72em;
         padding: 4px 6px;
       }
@@ -683,7 +686,7 @@
       .survival-hp-card .hp-bar-outer { height: 5px; }
 
       /* 로그: 초소형 */
-      .survival-log { max-height: 70px; font-size: 0.63em; }
+      .survival-log { max-height: 18vh; font-size: 0.63em; }
       .log-filter-btn { font-size: 0.6em; padding: 2px 6px; }
 
       /* 전투 */
@@ -1944,19 +1947,18 @@
       return { cx: W/2, cy: H*0.55, dw: W*0.46, dh: H*0.40 };
     }
 
-    // 그리드 셀의 쿼터뷰 꼭짓점 4개 계산
-    function gridCellToIso(col, row, cx, cy, dw, dh) {
+    // 그리드 셀의 쿼터뷰 꼭짓점 4개 계산 (카메라 오프셋 포함)
+    function gridCellToIso(col, row, cx, cy, dw, dh, camShift) {
       const cellW = 2.0 / GRID_COLS;
       const cellH = 2.0 / GRID_ROWS;
       const x0 = col * cellW - 1;
       const y0 = row * cellH - 1;
-      // 4 corners in normalized coords
       const corners = [
         [x0, y0], [x0 + cellW, y0],
         [x0 + cellW, y0 + cellH], [x0, y0 + cellH]
       ];
       return corners.map(([nx, ny]) => ({
-        sx: cx + (nx - ny) * dw * 0.5,
+        sx: cx + (nx - ny) * dw * 0.5 + (camShift || 0),
         sy: cy + (nx + ny) * dh * 0.5
       }));
     }
@@ -1973,8 +1975,7 @@
       // Draw grid cells
       for (let r = 0; r < GRID_ROWS; r++) {
         for (let c = 0; c < GRID_COLS; c++) {
-          const pts = gridCellToIso(c, r, cx, cy, dw, dh);
-          const shifted = pts.map(p => ({ sx: p.sx + camShiftGlobal, sy: p.sy }));
+          const shifted = gridCellToIso(c, r, cx, cy, dw, dh, camShiftGlobal);
 
           const isWall = WALL_COLS.includes(c);
 
@@ -1984,21 +1985,30 @@
           sCtx.closePath();
 
           if (isWall) {
-            // 벽 셀: 진한 색 + 빗금 패턴
-            sCtx.fillStyle = '#1a0a0a';
+            // 벽 셀: 밝은 빨강 + 강한 테두리 + 격자
+            sCtx.fillStyle = '#2a0a10';
             sCtx.fill();
             sCtx.strokeStyle = '#e94560';
-            sCtx.lineWidth = 2;
+            sCtx.lineWidth = 3;
             sCtx.stroke();
-            // X 패턴
-            sCtx.strokeStyle = 'rgba(233,69,96,0.4)';
-            sCtx.lineWidth = 1;
+            // X 격자 패턴
+            sCtx.strokeStyle = 'rgba(233,69,96,0.5)';
+            sCtx.lineWidth = 1.5;
             sCtx.beginPath();
             sCtx.moveTo(shifted[0].sx, shifted[0].sy);
             sCtx.lineTo(shifted[2].sx, shifted[2].sy);
             sCtx.moveTo(shifted[1].sx, shifted[1].sy);
             sCtx.lineTo(shifted[3].sx, shifted[3].sy);
             sCtx.stroke();
+            // 벽 아이콘 (가운데 행에만)
+            if (r === Math.floor(GRID_ROWS / 2)) {
+              const mx = (shifted[0].sx + shifted[2].sx) / 2;
+              const my = (shifted[0].sy + shifted[2].sy) / 2;
+              sCtx.fillStyle = '#e94560';
+              sCtx.font = `${Math.round(W * 0.025)}px sans-serif`;
+              sCtx.textAlign = 'center';
+              sCtx.fillText('🧱', mx, my + 4);
+            }
           } else {
             // 일반 셀
             const zone = c < WALL_COLS[0] ? 0 : c < WALL_COLS[1] ? 1 : 2;
@@ -2268,6 +2278,20 @@
       survivalAnimFrameId = requestAnimationFrame(survivalAnimLoop);
     });
 
+    // HP카드 탭 → 로그 필터
+    document.getElementById('survivalHpBars')?.addEventListener('click', (e) => {
+      const card = e.target.closest('.survival-hp-card');
+      if (!card) return;
+      const charId = card.dataset.charId;
+      if (!charId) return;
+      // 같은 캐릭터 다시 누르면 전체로
+      if (logFilter === charId) {
+        setLogFilter('all');
+      } else {
+        setLogFilter(charId);
+      }
+    });
+
     let logFiltersInited = false;
     socket.on('survivalTick', (data) => {
       survivalChars = data.state;
@@ -2313,7 +2337,8 @@
         const chaos = (c.chaos || 0) > 0 ? `<span style="color:#ff4444;font-size:0.8em"> 🔥${c.chaos}</span>` : '';
         const isMe = c.id === 'p0';
         const border = isMe ? 'border:1px solid #e94560' : '';
-        return `<div class="survival-hp-card ${c.alive ? '' : 'dead'}" style="${border}">
+        const filterCls = logFilter === c.id ? 'filter-active' : '';
+        return `<div class="survival-hp-card ${c.alive ? '' : 'dead'} ${filterCls}" data-char-id="${c.id}" style="${border}">
           <div class="hp-name" style="color:${color}">${esc(c.name)}${chaos}</div>
           <div class="hp-bar-outer"><div class="hp-bar-inner" style="width:${pct}%;background:${color}"></div></div>
           <div class="hp-info">${c.hp}/${c.maxHP} | ♥${lives}</div>
