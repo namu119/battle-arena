@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1a1a2e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Battle Arena</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -154,6 +157,8 @@
       aspect-ratio: 2 / 1;
       display: block;
       touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
     }
     .hp-bars {
       display: flex;
@@ -217,6 +222,8 @@
       aspect-ratio: 2 / 1;
       display: block;
       touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
     }
     .survival-hp-bottom {
       display: flex;
@@ -291,9 +298,7 @@
       font-size: 0.8em;
       color: #7ec8e3;
       animation: fadeInOut 2.5s forwards;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      word-break: keep-all;
     }
     @keyframes fadeInOut {
       0% { opacity: 0; transform: translateY(-8px); }
@@ -382,12 +387,30 @@
       .points-display { font-size: 1em; }
 
       .hp-bars {
-        flex-direction: column;
-        align-items: center;
-        gap: 8px;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 6px;
+        justify-content: center;
+        padding: 0 4px;
       }
-      .hp-bar-container { min-width: 0; width: 90%; }
+      .hp-bar-container { width: calc(50% - 6px); min-width: 0; }
       .hp-bar-bg { width: 100%; }
+      .char-name { font-size: 0.78em; }
+      .hp-text { font-size: 0.68em; }
+
+      /* 스탯 슬라이더 터치 타겟 */
+      .stat-row { min-height: 44px; }
+      .stat-row input[type=range] { height: 28px; }
+
+      /* 닉네임 입력 */
+      #playerName { width: 80%; max-width: 280px; text-align: center; }
+
+      /* 알림 모바일 */
+      .survival-notify-item { font-size: 0.7em; padding: 3px 6px; }
+      #survivalNotify { max-width: 48%; right: 4px; top: 4px; }
+
+      /* 로그 축소 */
+      .survival-log { max-height: 48px; font-size: 0.7em; }
 
       .result-card {
         min-width: auto;
@@ -447,11 +470,22 @@
       .item-card { padding: 8px; }
       .item-name { font-size: 0.85em; }
       .shop-section { padding: 10px; }
-      #survivalHud { gap: 4px !important; }
-      #survivalHud > div { font-size: 0.8em !important; }
-      .hp-bar-container { width: 95%; }
-      .char-name { font-size: 0.8em; }
-      .hp-text { font-size: 0.7em; }
+      .survival-hud-row { gap: 6px; font-size: 0.8em; }
+      .hp-bar-container { width: calc(50% - 4px); }
+      .char-name { font-size: 0.72em; }
+      .hp-text { font-size: 0.65em; }
+      /* HP 카드 초소형 */
+      .survival-hp-bottom { gap: 4px; }
+      .survival-hp-card { padding: 4px 5px; }
+      .survival-hp-card .hp-name { font-size: 0.7em; }
+      .survival-hp-card .hp-info { font-size: 0.6em; }
+      .survival-hp-card .hp-bar-outer { height: 6px; }
+      /* 로그 숨김 */
+      .survival-log { display: none; }
+      /* 전투 헤더 */
+      #battle-screen > div:first-child { margin: 6px 4px !important; gap: 6px !important; }
+      /* 로딩 */
+      #loading-overlay { padding: 20px; text-align: center; }
     }
   </style>
 </head>
@@ -515,7 +549,7 @@
       <div class="skill-select" id="skillSelect"></div>
     </div>
 
-    <div style="margin: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+    <div style="margin: 10px 8px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; width: 100%; box-sizing: border-box;">
       <button class="btn" id="submitBtn" onclick="submitBuild()" disabled style="display:none">출전!</button>
       <button class="btn" id="aiBtn" onclick="fightAI()" disabled style="background:#0f3460;border:1px solid #7ec8e3;display:none">AI와 전투</button>
       <button class="btn" id="survivalBtn" onclick="startSurvival()" disabled style="background:#2d1b69;border:1px solid #e94560;display:none">서바이벌 시작</button>
@@ -527,7 +561,7 @@
   <div id="battle-screen">
     <div style="display:flex;align-items:center;gap:10px;margin:10px">
       <h2 style="margin:0">전투 진행중</h2>
-      <button class="btn btn-secondary" id="speedBtn" style="padding:6px 12px;font-size:13px;min-height:32px">1x</button>
+      <button class="btn btn-secondary" id="speedBtn" style="padding:6px 12px;font-size:13px">1x</button>
     </div>
     <div class="hp-bars" id="hpBars"></div>
     <canvas id="battle-canvas"></canvas>
@@ -540,7 +574,7 @@
       <div class="survival-hud-row">
         <div style="color:#e94560;font-weight:bold;font-size:1.2em" id="survivalTimer">5:00</div>
         <div style="color:#f0a500;font-weight:bold" id="survivalPhase">Phase 1 - PvE</div>
-        <button class="btn btn-secondary" id="survivalSpeedBtn" style="padding:4px 10px;font-size:13px;min-height:30px">1x</button>
+        <button class="btn btn-secondary" id="survivalSpeedBtn" style="padding:6px 12px;font-size:13px">1x</button>
       </div>
       <div class="survival-hud-row">
         <div style="color:#f0a500" id="survivalGold">💰 0G</div>
@@ -963,9 +997,11 @@
     // ─── Task 2: Canvas resize (2:1 aspect) ───
     function resizeCanvas() {
       const container = canvas.parentElement;
-      const w = Math.min(800, container.clientWidth - 20);
+      const style = getComputedStyle(container);
+      const pad = parseFloat(style.paddingLeft || 0) + parseFloat(style.paddingRight || 0);
+      const w = Math.min(800, container.clientWidth - Math.max(pad, 10));
       canvas.width = w;
-      canvas.height = Math.round(w * 0.5); // 2:1 ratio
+      canvas.height = Math.round(w * 0.5);
     }
 
     resizeCanvas();
@@ -1629,7 +1665,10 @@
 
     function resizeSurvivalCanvas() {
       if (!survivalCanvas) return;
-      const w = Math.min(800, survivalCanvas.parentElement.clientWidth - 20);
+      const container = survivalCanvas.parentElement;
+      const style = getComputedStyle(container);
+      const pad = parseFloat(style.paddingLeft || 0) + parseFloat(style.paddingRight || 0);
+      const w = Math.min(800, container.clientWidth - Math.max(pad, 10));
       survivalCanvas.width = w;
       survivalCanvas.height = Math.round(w * 0.5);
     }
@@ -1796,9 +1835,9 @@
         }
       }
 
-      // Minimap (top-left corner)
-      const mmW = W * 0.2;
-      const mmH = H * 0.12;
+      // Minimap (top-left corner, bigger on mobile)
+      const mmW = isMobile ? Math.min(W * 0.28, 90) : W * 0.2;
+      const mmH = isMobile ? 20 : H * 0.12;
       const mmX = 6;
       const mmY = 6;
       sCtx.fillStyle = 'rgba(0,0,0,0.5)';
