@@ -16,6 +16,7 @@ class BattleEngine {
     this.maxTicks = options.maxTicks || MAX_TICKS;
     this.finishCondition = options.finishCondition || 'lastStanding';
     this.pendingCharacters = [];
+    this.wallBarriers = []; // [{x, active}] - set by orchestrator
 
     this.initCharacters(players);
   }
@@ -97,7 +98,7 @@ class BattleEngine {
     for (const char of ordered) {
       if (!char.alive) continue;
 
-      const bt = new BehaviorTree(char, { characters: this.characters });
+      const bt = new BehaviorTree(char, { characters: this.characters, wallBarriers: this.wallBarriers });
       const action = bt.evaluate();
 
       this.executeAction(char, action);
@@ -294,6 +295,20 @@ class BattleEngine {
     // 맵 경계
     char.x = Math.max(0, Math.min(ARENA_WIDTH, char.x));
     char.y = Math.max(0, Math.min(ARENA_HEIGHT, char.y));
+
+    // 벽 차단: 활성 벽을 넘을 수 없음
+    if (this.wallBarriers.length > 0 && char._wallSide) {
+      for (let wi = 0; wi < this.wallBarriers.length; wi++) {
+        const wb = this.wallBarriers[wi];
+        if (!wb.active) continue;
+        const side = char._wallSide[wi];
+        if (side === 'left' && char.x > wb.x - 20) {
+          char.x = wb.x - 20;
+        } else if (side === 'right' && char.x < wb.x + 20) {
+          char.x = wb.x + 20;
+        }
+      }
+    }
   }
 
   /** 데미지 적용 */

@@ -15,14 +15,21 @@ const ZONE_MERGES = [
 
 class SurvivalArena {
   constructor(builds) {
-    // Init respawn BEFORE _assignZones (which uses it)
+    // Init BEFORE _assignZones and engine
     this.respawnLives = new Map();
     this.respawnQueue = [];
+    this.walls = (require('../data/drops.json').walls || []).map(w => ({ ...w, active: true }));
 
     this.engine = new BattleEngine(this._assignZones(builds), {
       maxTicks: MAX_SURVIVAL_TICKS,
       finishCondition: 'external',
     });
+    // Set wall barriers on engine for movement blocking
+    this.engine.wallBarriers = this.walls.map(w => ({ x: w.x, active: true }));
+    // Assign wall sides to each player character
+    for (const char of this.engine.characters) {
+      char._wallSide = this.walls.map(w => char.x < w.x ? 'left' : 'right');
+    }
     this.waveManager = new MonsterWaveManager();
     this.dropSystem = new DropSystem();
     this.tick = 0;
@@ -33,8 +40,7 @@ class SurvivalArena {
     this.log = [];
     this.metaEvents = []; // zone merges, wave spawns, drops
     this.bossSpawned = false;
-    this.bossKiller = null; // player who got last hit on boss
-    this.walls = (require('../data/drops.json').walls || []).map(w => ({ ...w, active: true }));
+    this.bossKiller = null;
     this._charWallSides = new Map();
   }
 
@@ -308,38 +314,22 @@ class SurvivalArena {
     for (let wi = 0; wi < this.walls.length; wi++) {
       const wall = this.walls[wi];
       if (!wall.active) continue;
+      // Gatekeeper must be within 200px of wall (they wander)
       const gkAlive = this.engine.characters.some(
-        c => c.isGatekeeper && c.alive && Math.abs(c.x - wall.x) < 100
+        c => c.isGatekeeper && c.alive && Math.abs(c.x - wall.x) < 200
       );
       if (!gkAlive) {
         wall.active = false;
+        // Sync to engine barriers
+        if (this.engine.wallBarriers[wi]) this.engine.wallBarriers[wi].active = false;
         this.metaEvents.push({ type: 'wallBreak', wallX: wall.x, label: wall.label, stage: wall.stage });
       }
     }
 
-    // Clamp characters to their starting side of active walls
+    // Assign wall sides to any new characters (monsters spawned mid-game)
     for (const char of this.engine.characters) {
-      if (!char.alive) continue;
-
-      // Register starting side on first encounter
-      if (!this._charWallSides.has(char.id)) {
-        const sides = {};
-        for (let wi = 0; wi < this.walls.length; wi++) {
-          sides[wi] = char.x < this.walls[wi].x ? 'left' : 'right';
-        }
-        this._charWallSides.set(char.id, sides);
-      }
-
-      const sides = this._charWallSides.get(char.id);
-      for (let wi = 0; wi < this.walls.length; wi++) {
-        const wall = this.walls[wi];
-        if (!wall.active) continue;
-        const side = sides[wi];
-        if (side === 'left' && char.x > wall.x - 30) {
-          char.x = wall.x - 30;
-        } else if (side === 'right' && char.x < wall.x + 30) {
-          char.x = wall.x + 30;
-        }
+      if (!char._wallSide) {
+        char._wallSide = this.walls.map(w => char.x < w.x ? 'left' : 'right');
       }
     }
 
@@ -347,7 +337,7 @@ class SurvivalArena {
     for (const char of this.engine.characters) {
       if (char.isMonster) continue;
       const kills = this.engine.characters.filter(c => !c.isMonster && !c.alive && c.killedBy === char.id).length;
-      char.chaos = kills * 30; // Each player kill = 30 chaos
+      char.chaos = kills * 30;
     }
   }
 

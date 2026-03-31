@@ -200,9 +200,18 @@ class BehaviorTree {
   // ─── 유틸리티 ───
 
   getEnemies() {
-    return this.state.characters.filter(
-      c => c.team !== this.char.team && c.alive
-    );
+    return this.state.characters.filter(c => {
+      if (c.team === this.char.team || !c.alive) return false;
+      // 벽 차단: 활성 벽 사이에 있는 적은 타겟 불가
+      if (this.char._wallSide && c._wallSide) {
+        for (let wi = 0; wi < this.char._wallSide.length; wi++) {
+          // 벽이 활성화 상태이고 서로 다른 쪽에 있으면 제외
+          const wallActive = this.state.wallBarriers && this.state.wallBarriers[wi]?.active;
+          if (wallActive && this.char._wallSide[wi] !== c._wallSide[wi]) return false;
+        }
+      }
+      return true;
+    });
   }
 
   getNearbyEnemies(radius) {
