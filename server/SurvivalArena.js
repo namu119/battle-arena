@@ -2,9 +2,10 @@ const { BattleEngine, TICK_INTERVAL } = require('./BattleEngine');
 const { MonsterWaveManager, ZONE_BOUNDS } = require('./MonsterWaveManager');
 const { DropSystem } = require('./DropSystem');
 
-const ARENA_WIDTH = 800;
+const ARENA_WIDTH = 1600;
 const ARENA_HEIGHT = 400;
 const MAX_SURVIVAL_TICKS = 1500; // 5분
+const monstersData = require('../data/monsters.json');
 
 // Zone merge schedule
 const ZONE_MERGES = [
@@ -27,15 +28,20 @@ class SurvivalArena {
     this.results = null;
     this.log = [];
     this.metaEvents = []; // zone merges, wave spawns, drops
+    this.bossSpawned = false;
+    this.bossKiller = null; // player who got last hit on boss
+    this.walls = (require('../data/drops.json').walls || []).map(w => ({ ...w, active: true }));
+    // Track which side of each wall each character started on
+    this._charWallSides = new Map(); // charId -> { wallIdx: 'left'|'right' }
   }
 
   _assignZones(builds) {
-    // Zone starting positions: center of each zone quadrant
+    // Wider map (1600px): players at 4 corners, walls at 550/1050
     const zonePositions = [
-      { x: 100, zoneId: 0 },  // zone 0: x 0-200
-      { x: 300, zoneId: 1 },  // zone 1: x 200-400
-      { x: 500, zoneId: 2 },  // zone 2: x 400-600
-      { x: 700, zoneId: 3 },  // zone 3: x 600-800
+      { x: 80, zoneId: 0 },     // zone 0: far left
+      { x: 450, zoneId: 1 },    // zone 1: left-center (near wall 1)
+      { x: 1150, zoneId: 2 },   // zone 2: right-center (near wall 2)
+      { x: 1520, zoneId: 3 },   // zone 3: far right
     ];
 
     return builds.map((build, i) => ({
@@ -92,10 +98,20 @@ class SurvivalArena {
       }
     }
 
-    // 5. Check zone merges
-    this._checkZoneMerges();
+    // 5. Enforce walls + check gatekeeper deaths
+    this._enforceWalls();
 
-    // 6. Check end condition: only 1 player alive (ignore monsters)
+    // 6. Check zone merges + boss spawn
+    this._checkZoneMerges();
+    this._checkBossSpawn();
+
+    // 6. Check end conditions
+    // A) Boss killed → last-hitter wins
+    if (this.bossKiller) {
+      this._finishByBossKill();
+      return;
+    }
+    // B) Only 1 player alive
     const alivePlayers = this.engine.characters.filter(c => c.alive && !c.isMonster);
     if (alivePlayers.length <= 1) {
       this._finishBattle();
@@ -132,7 +148,16 @@ class SurvivalArena {
         const deadChar = this.engine.characters.find(c => c.id === evt.target);
         const killer = this.engine.characters.find(c => c.id === evt.killedBy);
         if (deadChar && killer) {
-          if (deadChar.isMonster) {
+          if (deadChar.isBoss) {
+            // Boss killed! Last-hitter wins
+            this.bossKiller = killer.id;
+            this.metaEvents.push({ type: 'bossKill', killerId: killer.id, killerName: killer.name, bossName: deadChar.name });
+            // Boss also drops loot
+            const drop = this.dropSystem.processMonsterDeath(deadChar, killer);
+            if (drop) {
+              this.metaEvents.push({ type: 'drop', dropType: drop.type, slot: drop.slot, level: drop.level, statBonus: drop.statBonus, gold: drop.gold, playerId: drop.playerId });
+            }
+          } else if (deadChar.isMonster) {
             // Monster kill → equipment drop
             const drop = this.dropSystem.processMonsterDeath(deadChar, killer);
             if (drop) {
@@ -199,16 +224,123 @@ class SurvivalArena {
   }
 
   _getExpandedBounds(zoneId) {
-    // After merges, zones expand to cover merged area
+    // After merges, zones expand to cover merged area (1600px map)
     if (this.activeZones.size <= 1) {
       return { minX: 0, maxX: ARENA_WIDTH };
     }
     if (this.activeZones.size <= 2) {
-      // zone 0 covers [0,400], zone 2 covers [400,800]
-      if (zoneId === 0) return { minX: 0, maxX: 400 };
-      if (zoneId === 2) return { minX: 400, maxX: 800 };
+      if (zoneId === 0) return { minX: 0, maxX: 800 };
+      if (zoneId === 2) return { minX: 800, maxX: 1600 };
     }
     return ZONE_BOUNDS[zoneId] || { minX: 0, maxX: ARENA_WIDTH };
+  }
+
+  _enforceWalls() {
+    // Check if gatekeepers at each wall are dead → deactivate wall
+    for (let wi = 0; wi < this.walls.length; wi++) {
+      const wall = this.walls[wi];
+      if (!wall.active) continue;
+      const gkAlive = this.engine.characters.some(
+        c => c.isGatekeeper && c.alive && Math.abs(c.x - wall.x) < 100
+      );
+      if (!gkAlive) {
+        wall.active = false;
+        this.metaEvents.push({ type: 'wallBreak', wallX: wall.x, label: wall.label, stage: wall.stage });
+      }
+    }
+
+    // Clamp characters to their starting side of active walls
+    for (const char of this.engine.characters) {
+      if (!char.alive) continue;
+
+      // Register starting side on first encounter
+      if (!this._charWallSides.has(char.id)) {
+        const sides = {};
+        for (let wi = 0; wi < this.walls.length; wi++) {
+          sides[wi] = char.x < this.walls[wi].x ? 'left' : 'right';
+        }
+        this._charWallSides.set(char.id, sides);
+      }
+
+      const sides = this._charWallSides.get(char.id);
+      for (let wi = 0; wi < this.walls.length; wi++) {
+        const wall = this.walls[wi];
+        if (!wall.active) continue;
+        const side = sides[wi];
+        if (side === 'left' && char.x > wall.x - 30) {
+          char.x = wall.x - 30;
+        } else if (side === 'right' && char.x < wall.x + 30) {
+          char.x = wall.x + 30;
+        }
+      }
+    }
+
+    // Update chaos levels on characters (playerKills → chaos)
+    for (const char of this.engine.characters) {
+      if (char.isMonster) continue;
+      const kills = this.engine.characters.filter(c => !c.isMonster && !c.alive && c.killedBy === char.id).length;
+      char.chaos = kills * 30; // Each player kill = 30 chaos
+    }
+  }
+
+  _checkBossSpawn() {
+    if (this.bossSpawned) return;
+    // Spawn boss when: all walls broken OR tick >= 600
+    const allWallsBroken = this.walls.every(w => !w.active);
+    if (allWallsBroken || this.tick >= 600) {
+      this.bossSpawned = true;
+      const bossTemplate = monstersData.boss_ancient_dragon;
+      if (!bossTemplate) return;
+      const boss = {
+        id: 'boss_0',
+        name: '🐉 ' + bossTemplate.name,
+        team: -1,
+        className: '최종보스',
+        passive: null,
+        stats: { maxHP: bossTemplate.hp, ATK: bossTemplate.atk, DEF: bossTemplate.def, INT: 0, SPD: bossTemplate.spd },
+        hp: bossTemplate.hp,
+        range: bossTemplate.range,
+        btWeights: { ...bossTemplate.btWeights },
+        skills: bossTemplate.skills.map(s => ({ ...s })),
+        x: ARENA_WIDTH / 2,
+        y: ARENA_HEIGHT / 2,
+        zoneId: null,
+        buffs: [],
+        alive: true,
+        isMonster: true,
+        isBoss: true,
+        level: bossTemplate.level,
+      };
+      this.engine.addCharacter(boss);
+      this.metaEvents.push({ type: 'bossSpawn', name: bossTemplate.name, hp: bossTemplate.hp });
+    }
+  }
+
+  _finishByBossKill() {
+    this.finished = true;
+    const players = this.engine.characters.filter(c => !c.isMonster);
+    const killer = players.find(c => c.id === this.bossKiller);
+
+    // Boss killer gets rank 1, rest ranked by alive > HP ratio
+    const others = players.filter(c => c.id !== this.bossKiller);
+    const sorted = [...others].sort((a, b) => {
+      if (a.alive !== b.alive) return b.alive - a.alive;
+      return (b.hp / b.stats.maxHP) - (a.hp / a.stats.maxHP);
+    });
+
+    const ranking = killer ? [killer, ...sorted] : sorted;
+    this.results = ranking.map((c, i) => ({
+      rank: i + 1,
+      id: c.id,
+      name: c.name,
+      className: c.className,
+      alive: c.alive,
+      hpRemaining: c.hp,
+      gold: c.gold || 0,
+      enhancementLevels: c.enhancementLevels || {},
+      monstersKilled: this.engine.characters.filter(m => m.isMonster && !m.alive && m.killedBy === c.id).length,
+      bossKiller: c.id === this.bossKiller,
+    }));
   }
 
   _finishBattle() {

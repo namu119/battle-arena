@@ -25,9 +25,20 @@ class DropSystem {
 
     // Random slot
     const slot = SLOTS[Math.floor(Math.random() * SLOTS.length)];
-    const statBonus = table.statBonus.min + Math.floor(Math.random() * (table.statBonus.max - table.statBonus.min + 1));
 
+    // 드랍 확률: 기본 25%, 강화 레벨당 50%씩 감소
     const currentLevel = killerChar.enhancementLevels[slot] || 0;
+    const baseDropRate = 0.25;
+    const dropRate = baseDropRate * Math.pow(0.5, currentLevel);
+    if (Math.random() > dropRate) {
+      // 드랍 실패 → 골드 보상만
+      const goldGain = Math.floor(table.goldOnOverflow * 0.3);
+      if (goldGain > 0) {
+        killerChar.gold = (killerChar.gold || 0) + goldGain;
+      }
+      return null;
+    }
+    const statBonus = table.statBonus.min + Math.floor(Math.random() * (table.statBonus.max - table.statBonus.min + 1));
 
     if (currentLevel >= dropsData.enhancement.maxLevel) {
       // Overflow -> gold

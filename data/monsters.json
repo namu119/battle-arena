@@ -96,5 +96,45 @@
     "skills": [
       { "name": "화염숨결", "type": "attack", "damage": 25, "aoe": true, "cooldown": 10, "description": "범위 화염" }
     ]
+  },
+  "lv5_gate_golem": {
+    "name": "게이트골렘",
+    "level": 5,
+    "hp": 400,
+    "atk": 18,
+    "def": 15,
+    "spd": 2,
+    "range": 70,
+    "btWeights": { "survive": 40, "skill": 20, "attack": 40 },
+    "skills": [
+      { "name": "대지진동", "type": "attack", "damage": 30, "aoe": true, "cooldown": 12, "description": "주변 강타" }
+    ]
+  },
+  "boss_ancient_dragon": {
+    "name": "고대용",
+    "level": 10,
+    "hp": 1500,
+    "atk": 25,
+    "def": 20,
+    "spd": 3,
+    "range": 150,
+    "btWeights": { "survive": 10, "skill": 50, "attack": 40 },
+    "skills": [
+      { "name": "멸절의숨결", "type": "attack", "damage": 50, "aoe": true, "cooldown": 8, "description": "전체 화염" },
+      { "name": "용의포효", "type": "attack", "damage": 35, "cooldown": 5, "description": "강력한 일격" }
+    ]
+  },
+  "lv5_gate_dragon": {
+    "name": "게이트드래곤",
+    "level": 5,
+    "hp": 350,
+    "atk": 22,
+    "def": 10,
+    "spd": 4,
+    "range": 120,
+    "btWeights": { "survive": 20, "skill": 50, "attack": 30 },
+    "skills": [
+      { "name": "용염폭풍", "type": "attack", "damage": 40, "aoe": true, "cooldown": 10, "description": "광역 화염" }
+    ]
   }
 }

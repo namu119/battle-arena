@@ -1,15 +1,18 @@
 const monstersData = require('../data/monsters.json');
 const dropsData = require('../data/drops.json');
 
-const ARENA_WIDTH = 800;
+const ARENA_WIDTH = 1600;
 
-// Zone boundaries: zone 0=[0,200], 1=[200,400], 2=[400,600], 3=[600,800]
+// Zone boundaries on wider map: 4 zones spread across 1600px
 const ZONE_BOUNDS = {
-  0: { minX: 0, maxX: 200 },
-  1: { minX: 200, maxX: 400 },
-  2: { minX: 400, maxX: 600 },
-  3: { minX: 600, maxX: 800 },
+  0: { minX: 0, maxX: 400 },
+  1: { minX: 0, maxX: 400 },
+  2: { minX: 1200, maxX: 1600 },
+  3: { minX: 1200, maxX: 1600 },
 };
+
+// Wall positions
+const WALLS = dropsData.walls || [];
 
 // Monster pool by level
 const MONSTER_POOL = {
@@ -17,12 +20,14 @@ const MONSTER_POOL = {
   lv2: Object.values(monstersData).filter(m => m.level === 2),
   lv3: Object.values(monstersData).filter(m => m.level === 3),
   lv4: Object.values(monstersData).filter(m => m.level === 4),
+  lv5: Object.values(monstersData).filter(m => m.level === 5),
 };
 
 class MonsterWaveManager {
   constructor() {
     this.monsterIdCounter = 0;
     this.scheduledWaves = this._buildSchedule();
+    this.gatekeeperSchedule = this._buildGatekeeperSchedule();
     this.spawnedWaves = new Set();
   }
 
@@ -39,9 +44,20 @@ class MonsterWaveManager {
     return schedule;
   }
 
+  _buildGatekeeperSchedule() {
+    return (dropsData.waveSchedule.gatekeepers || []).map((g, i) => ({
+      tick: g.tick,
+      wallIndex: g.wallIndex,
+      monsters: g.monsters,
+      id: `gk_${i}`,
+    }));
+  }
+
   /** Check if any waves should spawn this tick, return monster charData[] */
   getSpawns(tick, activeZoneIds, boundsResolver) {
     const spawns = [];
+
+    // Regular waves
     for (const wave of this.scheduledWaves) {
       if (wave.tick === tick && !this.spawnedWaves.has(wave.wave)) {
         this.spawnedWaves.add(wave.wave);
@@ -52,6 +68,46 @@ class MonsterWaveManager {
         }
       }
     }
+
+    // Gatekeeper spawns (at wall positions)
+    for (const gk of this.gatekeeperSchedule) {
+      if (gk.tick === tick && !this.spawnedWaves.has(gk.id)) {
+        this.spawnedWaves.add(gk.id);
+        const wall = WALLS[gk.wallIndex];
+        if (!wall) continue;
+        for (const group of gk.monsters) {
+          const pool = MONSTER_POOL[group.type];
+          if (!pool || pool.length === 0) continue;
+          for (let i = 0; i < group.count; i++) {
+            const template = pool[Math.floor(Math.random() * pool.length)];
+            const id = `gk_${gk.wallIndex}_${this.monsterIdCounter++}`;
+            // Spawn at wall X position (both sides)
+            const side = i % 2 === 0 ? -30 : 30;
+            spawns.push({
+              id,
+              name: `⚔${template.name}`,
+              team: -1,
+              className: `가디언Lv${template.level}`,
+              passive: null,
+              stats: { maxHP: template.hp, ATK: template.atk, DEF: template.def, INT: 0, SPD: template.spd },
+              hp: template.hp,
+              range: template.range,
+              btWeights: { ...template.btWeights },
+              skills: template.skills.map(s => ({ ...s })),
+              x: wall.x + side,
+              y: 200,
+              zoneId: null,
+              buffs: [],
+              alive: true,
+              isMonster: true,
+              isGatekeeper: true,
+              level: template.level,
+            });
+          }
+        }
+      }
+    }
+
     return spawns;
   }
 

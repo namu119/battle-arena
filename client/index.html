@@ -899,7 +899,7 @@
     let animFrameId = null;
     let isBattleActive = false;
     const deadAnimated = new Set(); // track characters whose death animation already played
-    const ARENA_WIDTH = 800;
+    const ARENA_WIDTH = 1600;
     const ARENA_HEIGHT = 400;
 
     // ─── Task 2: Canvas resize (2:1 aspect) ───
@@ -1654,8 +1654,8 @@
 
     function serverToSurvivalQV(serverX, charIdx, totalChars, W, H) {
       const { cx, cy, dw, dh } = getSurvivalDiamond(W, H);
-      // Normalize X from server coords
-      const normX = (serverX / 800) * 2 - 1;
+      // Normalize X from server coords (1600px wide map)
+      const normX = (serverX / 1600) * 2 - 1;
       // Derive stable Y from character index
       const normY = totalChars > 1 ? ((charIdx / (totalChars - 1)) * 2 - 1) * 0.6 : 0;
       // Isometric projection
@@ -1881,10 +1881,16 @@
           }
         }
         if (evt.type === 'waveSpawn') {
-          survivalNotify(`⚔ Wave ${evt.count > 20 ? '대규모' : ''} 몬스터 출현!`, '#ff6644');
+          survivalNotify(`⚔ Wave 몬스터 출현!`, '#ff6644');
         }
         if (evt.type === 'zoneMerge') {
           survivalNotify(`🔥 존 합류! Phase ${evt.phase}`, '#e94560');
+        }
+        if (evt.type === 'bossSpawn') {
+          survivalNotify(`🐉 최종보스 ${evt.name} 출현! HP:${evt.hp}`, '#ff0000');
+        }
+        if (evt.type === 'bossKill') {
+          survivalNotify(`👑 ${evt.killerName}이(가) 보스를 처치! 승리!`, '#ffd700');
         }
       }
     });
@@ -1902,10 +1908,12 @@
         const rankClass = r.rank <= 3 ? `rank-${r.rank}` : '';
         const enh = r.enhancementLevels || {};
         const enhTotal = Object.values(enh).reduce((a,b)=>a+b, 0);
+        const bossTag = r.bossKiller ? '<div style="color:#ffd700;font-weight:bold">👑 보스 처치자!</div>' : '';
         return `<div class="result-card">
           <div class="rank ${rankClass}">${r.rank}등</div>
           <div>
             <div style="font-weight:bold">${esc(r.name)} (${esc(r.className)})</div>
+            ${bossTag}
             <div style="color:#aaa">HP: ${r.hpRemaining} | 킬: ${r.monstersKilled || 0}마리</div>
             <div style="color:#f0a500">강화 Lv${enhTotal} (${enh.helmet||0}/${enh.armor||0}/${enh.weapon||0}/${enh.boots||0})</div>
             <div style="color:#f0a500">+${r.gold || 0}G</div>

@@ -1,7 +1,7 @@
 const { BehaviorTree } = require('../shared/BehaviorTree');
 
 const TICK_INTERVAL = 200; // ms
-const ARENA_WIDTH = 800;
+const ARENA_WIDTH = 1600;
 const ARENA_HEIGHT = 400;
 const MAX_TICKS = 300; // 60초 제한
 const DAMAGE_SCALE = 0.35; // 글로벌 데미지 감쇄

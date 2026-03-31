@@ -131,16 +131,69 @@ class BehaviorTree {
   executeAttack(enemies) {
     if (enemies.length === 0) return null;
 
-    const inRange = enemies.filter(e => this.getDistance(e) <= this.char.range);
+    // 위협 평가 + PvE 우선
+    const myPower = (this.char.stats?.ATK || 0) + (this.char.stats?.DEF || 0);
+    const monsters = enemies.filter(e => e.isMonster && !e.isBoss);
+    const bosses = enemies.filter(e => e.isBoss);
+    const players = enemies.filter(e => !e.isMonster);
 
+    // 안전한 적: 전투력 2배 미만
+    const safeMonsters = monsters.filter(e => {
+      const ePower = (e.stats?.ATK || 0) + (e.stats?.DEF || 0);
+      return ePower < myPower * 2;
+    });
+    const dangerousMonsters = monsters.filter(e => {
+      const ePower = (e.stats?.ATK || 0) + (e.stats?.DEF || 0);
+      return ePower >= myPower * 2;
+    });
+
+    // 카오스 기반 PvP 판단
+    const myChaos = this.char.chaos || 0;
+    const myHpRatio = this.char.hp / (this.char.stats?.maxHP || 1);
+
+    // 플레이어 필터: 강한 적 회피, 약한 적 공격
+    const filteredPlayers = players.filter(e => {
+      const ePower = (e.stats?.ATK || 0) + (e.stats?.DEF || 0);
+      const eHpRatio = (e.hp || 0) / (e.stats?.maxHP || 1);
+      // 상대가 훨씬 강하면 70% 확률로 회피
+      if (ePower > myPower * 1.5 && Math.random() < 0.7) return false;
+      // 내 HP 낮고 상대 HP 높으면 60% 확률로 회피
+      if (eHpRatio > 0.7 && myHpRatio < 0.4 && Math.random() < 0.6) return false;
+      return true;
+    });
+
+    // 킬러 견제: 카오스 30+ = 1킬러, 60+ = 학살자
+    const killers = filteredPlayers.filter(e => (e.chaos || 0) >= 30);
+
+    // 우선순위: 몬스터 파밍 → 보스 → 킬러 견제 → 먼 몬스터 → 약한 플레이어
+    const nearbyMonsters = safeMonsters.filter(e => this.getDistance(e) <= this.char.range * 3);
+    let targetPool;
+    if (nearbyMonsters.length > 0) {
+      targetPool = nearbyMonsters;
+    } else if (bosses.length > 0) {
+      targetPool = bosses;
+    } else if (killers.length > 0 && Math.random() < 0.6) {
+      targetPool = killers; // 60% 확률로 킬러 집중 공격
+    } else if (safeMonsters.length > 0) {
+      targetPool = safeMonsters;
+    } else if (filteredPlayers.length > 0) {
+      targetPool = filteredPlayers;
+    } else {
+      targetPool = enemies.length > 0 ? enemies : [];
+    }
+
+    if (targetPool.length === 0) return null;
+
+    const inRange = targetPool.filter(e => this.getDistance(e) <= this.char.range);
     if (inRange.length > 0) {
-      // 사거리 안 가장 약한 적 기본공격
-      const target = this.getWeakestEnemy(inRange);
+      const boss = inRange.find(e => e.isBoss);
+      if (boss) return { type: 'attack', target: boss.id };
+      const killer = inRange.find(e => (e.chaos || 0) >= 30);
+      const target = killer || this.getWeakestEnemy(inRange);
       return { type: 'attack', target: target.id };
     }
 
-    // 사거리 밖이면 가장 가까운 적에게 이동
-    const nearest = this.getNearestEnemy(enemies);
+    const nearest = this.getNearestEnemy(targetPool);
     return { type: 'move', direction: 'toward', target: nearest.id };
   }
 
