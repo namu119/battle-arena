@@ -356,6 +356,21 @@ function _getSurvivalPos(char) {
   return serverToSurvivalQV(char.x, idx, aliveList.length, survivalCanvas.width, survivalCanvas.height);
 }
 
+// ─── Kill Feed ───
+function addKillFeed(killerName, killerClass, victimName, victimClass, skill) {
+  var feed = document.getElementById('killFeed');
+  if (!feed) return;
+  var item = document.createElement('div');
+  item.className = 'kill-feed-item';
+  var skillText = skill ? ' [' + skill + ']' : '';
+  item.innerHTML = '<span class="killer">' + killerName + '</span><span class="skull">💀</span><span class="victim">' + victimName + '</span>' + skillText;
+  feed.appendChild(item);
+  // 최대 5개 유지
+  while (feed.children.length > 5) feed.removeChild(feed.firstChild);
+  // 4초 후 제거
+  setTimeout(function() { if (item.parentNode) item.parentNode.removeChild(item); }, 4000);
+}
+
 // ─── Survival Socket Events ───
 G.socket.on('survivalStart', function(data) {
   showScreen('survival-screen');
@@ -466,6 +481,10 @@ G.socket.on('survivalTick', function(data) {
         var dpos = serverToSurvivalQV(dc.x, cIdx, _aliveCache.length, survivalCanvas.width, survivalCanvas.height);
         G.survivalDeathAnims.set(evt.target, { born:performance.now(), duration:800 });
         var killer = evt.killedBy ? G.survivalChars.find(function(ch) { return ch.id === evt.killedBy; }) : null;
+        // Kill feed
+        if (killer && dc) {
+          addKillFeed(killer.name, killer.className, dc.name, dc.className, evt.skill || null);
+        }
         if (dc.isMonster) {
           survivalLogAdd('\u2620 ' + dc.name + ' 처치' + (killer ? ' by '+killer.name : ''), null, true);
         }

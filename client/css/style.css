@@ -1653,3 +1653,72 @@ input::placeholder {
 .signal-color-bar.on-cooldown .signal-label {
   color: var(--red);
 }
+
+
+/* ── Kill Feed ── */
+.kill-feed {
+  position: absolute;
+  top: 60px;
+  right: 10px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: none;
+  max-width: 250px;
+}
+.kill-feed-item {
+  background: rgba(0,0,0,0.7);
+  border-left: 3px solid var(--red);
+  padding: 4px 8px;
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  font-size: var(--fs-xs);
+  color: var(--text-primary);
+  animation: killFeedIn 0.3s var(--ease-out), killFeedOut 0.5s 3s forwards;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kill-feed-item .killer { color: var(--red); font-weight: var(--fw-semibold); }
+.kill-feed-item .victim { color: var(--text-secondary); }
+.kill-feed-item .skull { margin: 0 4px; }
+@keyframes killFeedIn { from { transform: translateX(30px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes killFeedOut { to { opacity: 0; transform: translateX(20px); height: 0; padding: 0; margin: 0; } }
+
+
+/* ── MVP Section ── */
+.mvp-section {
+  margin: 20px 0;
+  text-align: center;
+}
+.mvp-title {
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-bold);
+  color: var(--gold);
+  margin-bottom: 12px;
+  text-shadow: 0 0 12px var(--gold-glow);
+}
+.mvp-cards {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.mvp-card {
+  background: var(--bg-card);
+  border: 1px solid var(--gold);
+  border-radius: var(--r-md);
+  padding: 12px 16px;
+  min-width: 120px;
+  box-shadow: var(--shadow-glow-gold);
+  animation: mvpPop 0.5s var(--ease-out) both;
+}
+.mvp-card:nth-child(1) { animation-delay: 0.1s; }
+.mvp-card:nth-child(2) { animation-delay: 0.3s; }
+.mvp-card:nth-child(3) { animation-delay: 0.5s; }
+.mvp-card:nth-child(4) { animation-delay: 0.7s; }
+.mvp-icon { font-size: 1.8em; margin-bottom: 4px; }
+.mvp-label { font-size: var(--fs-xs); color: var(--text-muted); }
+.mvp-name { font-size: var(--fs-body); font-weight: var(--fw-semibold); color: var(--gold-bright); margin: 4px 0; }
+.mvp-value { font-size: var(--fs-small); color: var(--text-secondary); }
+@keyframes mvpPop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }

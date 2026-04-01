@@ -43,6 +43,8 @@ class SurvivalArena {
     this.metaEvents = []; // zone merges, wave spawns, drops
     this.bossSpawned = false;
     this.bossKiller = null;
+    this._playerKills = new Map();
+    this._playerDamage = new Map();
     this._charWallSides = new Map();
     this._lastMonsterCount = 0;
     this.pendingRewards = null;
@@ -683,6 +685,37 @@ class SurvivalArena {
       livesRemaining: this.respawnLives.get(c.id) || 0,
       bossKiller: c.id === this.bossKiller,
     }));
+  }
+
+  /** MVP 산출 */
+  _calculateMVP() {
+    const players = this.engine.characters.filter(c => !c.isMonster && !c.isDecoy);
+    const stats = players.map(c => {
+      const kills = this._playerKills.get(c.id) || 0;
+      const dmgDealt = this._playerDamage.get(c.id) || 0;
+      const gold = c.gold || 0;
+      const enhance = c.enhancementLevels ? Object.values(c.enhancementLevels).reduce((a,b) => a+b, 0) : 0;
+      return { id: c.id, name: c.name, className: c.className, kills, dmgDealt, gold, enhance, alive: c.alive, hp: c.hp };
+    });
+
+    const mvp = {};
+    // 최다 킬
+    const topKill = [...stats].sort((a,b) => b.kills - a.kills)[0];
+    if (topKill && topKill.kills > 0) mvp.topKiller = { name: topKill.name, className: topKill.className, kills: topKill.kills };
+    // 최다 데미지
+    const topDmg = [...stats].sort((a,b) => b.dmgDealt - a.dmgDealt)[0];
+    if (topDmg && topDmg.dmgDealt > 0) mvp.topDamage = { name: topDmg.name, className: topDmg.className, damage: topDmg.dmgDealt };
+    // 최다 골드
+    const topGold = [...stats].sort((a,b) => b.gold - a.gold)[0];
+    if (topGold && topGold.gold > 0) mvp.topGold = { name: topGold.name, className: topGold.className, gold: topGold.gold };
+    // 생존왕 (마지막까지 살아남은 + HP 비율 높은)
+    const survivor = [...stats].sort((a,b) => {
+      if (a.alive !== b.alive) return b.alive - a.alive;
+      return (b.hp / 1) - (a.hp / 1);
+    })[0];
+    if (survivor) mvp.survivor = { name: survivor.name, className: survivor.className, hp: survivor.hp };
+
+    return mvp;
   }
 
   _finishBattle() {
