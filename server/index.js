@@ -411,7 +411,18 @@ io.on('connection', (socket) => {
         runSurvivalSegment();
         return;
       }
-      emitToPlayers('survivalTick', result.newLog[tickIdx]);
+      // Overlay live signalColor/pvpStance onto pre-computed tick data
+          var tickData = result.newLog[tickIdx];
+          if (tickData && tickData.state && currentArena) {
+            for (var si = 0; si < tickData.state.length; si++) {
+              var liveChar = currentArena.engine.characters.find(function(ch) { return ch.id === tickData.state[si].id; });
+              if (liveChar) {
+                tickData.state[si].signalColor = liveChar.signalColor || 'none';
+                tickData.state[si].pvpStance = liveChar.pvpStance || 'retaliate';
+              }
+            }
+          }
+          emitToPlayers('survivalTick', tickData);
       tickIdx++;
     }, TICK_INTERVAL / (Game_speed || 1));
   }

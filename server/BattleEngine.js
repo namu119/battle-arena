@@ -144,6 +144,11 @@ class BattleEngine {
       if (alive.length <= 1) this.finishBattle(alive);
     }
 
+    // 5.5 죽은 잔상 정리 (매 10틱)
+    if (this.tick % 10 === 0) {
+      this.characters = this.characters.filter(c => c.alive || !c.isDecoy);
+    }
+
     // 6. 로그
     this.log.push({
       tick: this.tick,

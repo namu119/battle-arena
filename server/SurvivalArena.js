@@ -174,9 +174,11 @@ class SurvivalArena {
     return result;
   }
 
-  /** 보상 리롤 (새 3장 생성) */
+  /** 보상 리롤 (최대 2회) */
   rerollRewards() {
     if (!this.pendingRewards) return null;
+    if ((this._rerollCount || 0) >= 2) return null;
+    this._rerollCount = (this._rerollCount || 0) + 1;
     this.pendingRewards = this._generateRewards();
     return this.pendingRewards;
   }

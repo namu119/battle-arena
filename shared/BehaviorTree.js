@@ -155,7 +155,13 @@ class BehaviorTree {
       }
     }
 
-    // 4) 방어 스킬 (HP 70% 이하)
+    // 4) 존(장판) 스킬 - 적 2+ 밀집 시
+    if (nearbyEnemies.length >= 2) {
+      const zoneSkill = this.findReadySkill('zone');
+      if (zoneSkill) return { type: 'skill', skill: zoneSkill, target: this.char.id };
+    }
+
+    // 5) 방어 스킬 (HP 70% 이하)
     if (this.char.hp / this.char.stats.maxHP < 0.7) {
       const def = this.findReadySkill('defense');
       if (def) return { type: 'skill', skill: def, target: this.char.id };
