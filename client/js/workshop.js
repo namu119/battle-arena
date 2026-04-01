@@ -161,44 +161,44 @@ function wizardConfirm() {
 
 // ─── 렌더링 ───
 function renderClassCard() {
-  if (!selectedClass || !G.classData[selectedClass]) return '<div style="color:#666">로딩중...</div>';
+  if (!selectedClass || !G.classData[selectedClass]) return '<div class="wizard-loading">로딩중...</div>';
   var cls = G.classData[selectedClass];
   var icon = CLASS_ICONS[selectedClass] || '⚔️';
   var color = CLASS_COLORS_MAP[selectedClass] || '#e94560';
   var statBadges = Object.entries(stats).map(function(e) {
-    return e[1] > 0 ? '<span style="background:' + color + ';color:#fff;border-radius:4px;padding:2px 6px;font-size:0.8em;margin:2px">' + STAT_NAMES[e[0]] + ' ' + e[1] + '</span>' : '';
+    return e[1] > 0 ? '<span class="wizard-stat-badge" style="background:' + color + '">' + STAT_NAMES[e[0]] + ' ' + e[1] + '</span>' : '';
   }).join('');
 
-  return '<div style="text-align:center">' +
-    '<div style="font-size:1.1em;color:#888;margin-bottom:4px">STEP 1/3 — 병과 + 스탯</div>' +
-    '<div style="font-size:2.5em;margin:8px 0">' + icon + '</div>' +
-    '<div style="font-size:1.4em;font-weight:bold;color:' + color + '">' + selectedClass + '</div>' +
-    '<div style="color:#aaa;font-size:0.85em;margin:4px 0">HP:' + cls.baseHP + ' ATK:' + cls.baseATK + ' DEF:' + cls.baseDEF + ' SPD:' + cls.baseSPD + '</div>' +
-    '<div style="color:#7ec8e3;font-size:0.85em">패시브: ' + cls.passive.name + '</div>' +
-    '<div style="margin:8px 0">' + statBadges + '</div>' +
+  return '<div class="wizard-center">' +
+    '<div class="wizard-step-label wizard-step-label--tight">STEP 1/3 — 병과 + 스탯</div>' +
+    '<div class="wizard-class-icon">' + icon + '</div>' +
+    '<div class="wizard-class-name" style="color:' + color + '">' + selectedClass + '</div>' +
+    '<div class="wizard-base-stats">HP:' + cls.baseHP + ' ATK:' + cls.baseATK + ' DEF:' + cls.baseDEF + ' SPD:' + cls.baseSPD + '</div>' +
+    '<div class="wizard-passive">패시브: ' + cls.passive.name + '</div>' +
+    '<div class="wizard-badges">' + statBadges + '</div>' +
   '</div>';
 }
 
 function renderEquipCards() {
-  var html = '<div style="text-align:center;color:#888;font-size:1.1em;margin-bottom:8px">STEP 2/3 — 장비 4종</div>';
-  html += '<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center">';
+  var html = '<div class="wizard-step-label">STEP 2/3 — 장비 4종</div>';
+  html += '<div class="equip-grid">';
   var slots = ['helmet','armor','weapon','boots'];
   for (var i = 0; i < slots.length; i++) {
     var slot = slots[i];
     var name = equip[slot];
     if (!name) {
-      html += '<div class="item-card" style="min-width:120px;text-align:center;opacity:0.4"><div class="item-name">' + SLOT_NAMES[slot] + '</div><div style="color:#666">없음</div></div>';
+      html += '<div class="item-card equip-card-empty"><div class="item-name">' + SLOT_NAMES[slot] + '</div><div class="equip-empty-text">없음</div></div>';
       continue;
     }
     var cat = G.equipData[slotCategory[slot]];
     var item = cat[name];
     var statsStr = Object.entries(item.stats).map(function(e) { return e[0] + '+' + e[1]; }).join(' ');
-    html += '<div class="item-card" style="min-width:120px;text-align:center;border-color:#7ec8e3">' +
-      '<div style="font-size:0.7em;color:#888">' + SLOT_NAMES[slot] + '</div>' +
+    html += '<div class="item-card equip-card-inner">' +
+      '<div class="equip-slot-label">' + SLOT_NAMES[slot] + '</div>' +
       '<div class="item-name">' + name + '</div>' +
       '<div class="item-cost">' + item.cost + 'G</div>' +
       '<div class="item-stats">' + statsStr + '</div>' +
-      '<div style="color:#7ec8e3;font-size:0.75em">' + item.skill.name + '</div>' +
+      '<div class="equip-skill-name">' + item.skill.name + '</div>' +
     '</div>';
   }
   html += '</div>';
@@ -221,19 +221,19 @@ function getSkillCandidates() {
 }
 
 function renderSkillSelection() {
-  var html = '<div style="text-align:center;color:#888;font-size:1.1em;margin-bottom:8px">STEP 3/3 — 스킬 선택 (3개)</div>';
-  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">';
+  var html = '<div class="wizard-step-label">STEP 3/3 — 스킬 선택 (3개)</div>';
+  html += '<div class="skill-grid">';
   for (var i = 0; i < allSkillCandidates.length; i++) {
     var sk = allSkillCandidates[i];
     var isSelected = selectedSkills.indexOf(sk.name) >= 0;
     var typeIcon = sk.type === 'attack' ? '⚔️' : sk.type === 'defense' ? '🛡️' : sk.type === 'buff' ? '✨' : '🔄';
-    html += '<div class="skill-chip ' + (isSelected ? 'selected' : '') + '" data-skill="' + sk.name + '" onclick="toggleSkillSelect(\'' + sk.name + '\')" style="cursor:pointer;min-width:100px;text-align:center">' +
+    html += '<div class="skill-chip skill-chip-inner ' + (isSelected ? 'selected' : '') + '" data-skill="' + sk.name + '" onclick="toggleSkillSelect(\'' + sk.name + '\')">' +
       '<div>' + typeIcon + ' ' + sk.name + '</div>' +
-      '<div style="font-size:0.7em;color:#aaa">' + SLOT_NAMES[sk.slot] + ' · ' + sk.description + '</div>' +
+      '<div class="skill-desc">' + SLOT_NAMES[sk.slot] + ' · ' + sk.description + '</div>' +
     '</div>';
   }
   html += '</div>';
-  html += '<div style="text-align:center;margin-top:6px;color:#7ec8e3;font-size:0.9em">선택: ' + selectedSkills.length + '/3</div>';
+  html += '<div class="skill-selection-count">선택: ' + selectedSkills.length + '/3</div>';
   return html;
 }
 

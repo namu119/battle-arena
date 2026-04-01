@@ -10,6 +10,7 @@ window.Game = {
   classColors: { '전사':'#e94560', '마법사':'#7b2ff7', '도적':'#2ecc71', '기사':'#3498db', '궁수':'#f39c12' },
   playbackSpeed: 1,
   SPEED_OPTIONS: [1, 2, 4],
+  pvpStance: 'retaliate', // passive / hostile / retaliate
   // battle state
   battleChars: [],
   animations: [],
@@ -109,14 +110,14 @@ function startGame() {
 G.socket.on('roomList', function(list) {
   var el = document.getElementById('roomList');
   if (list.length === 0) {
-    el.innerHTML = '<p style="color:#666;margin:10px 0">열린 방이 없습니다</p>';
+    el.innerHTML = '<p class="room-empty-msg">열린 방이 없습니다</p>';
     return;
   }
   el.innerHTML = list.map(function(r) {
     return '<div class="room-list-card" data-room-id="' + esc(r.id) + '">' +
       '<div class="room-list-name">' + esc(r.name) + '</div>' +
       '<div class="room-list-info">' + r.playerCount + '/4</div>' +
-      '<button class="btn btn-secondary" style="padding:6px 14px;font-size:13px">참가</button>' +
+      '<button class="btn btn-secondary btn-sm">참가</button>' +
     '</div>';
   }).join('');
   el.querySelectorAll('.room-list-card').forEach(function(card) {
@@ -192,8 +193,31 @@ function backToLobby() {
 
 // 게임 종료 → 로비로 자동 복귀
 G.socket.on('gameOver', function() {
-  // 결과 화면 3초 후 로비로
-  setTimeout(function() { backToLobby(); }, 3000);
+  var remaining = 10;
+  var btn = document.querySelector('.result-lobby-btn');
+  if (btn) btn.textContent = '로비로 돌아가기 (' + remaining + ')';
+  var timer = setInterval(function() {
+    remaining--;
+    if (btn) btn.textContent = '로비로 돌아가기 (' + remaining + ')';
+    if (remaining <= 0) {
+      clearInterval(timer);
+      backToLobby();
+    }
+  }, 1000);
 });
 
 G.socket.on('error', function(msg) { alert(msg); });
+
+// ─── PvP 성향 전환 (3버튼) ───
+function setPvpStance(stance) {
+  G.pvpStance = stance;
+  G.socket.emit('setPvpStance', stance);
+  var ids = ['stancePassive', 'stanceRetaliate', 'stanceHostile'];
+  var map = { passive: 'stancePassive', retaliate: 'stanceRetaliate', hostile: 'stanceHostile' };
+  for (var i = 0; i < ids.length; i++) {
+    var el = document.getElementById(ids[i]);
+    if (el) el.classList.remove('active');
+  }
+  var active = document.getElementById(map[stance]);
+  if (active) active.classList.add('active');
+}

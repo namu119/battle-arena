@@ -11,6 +11,9 @@ var GRID_COLS = 10;
 var GRID_ROWS = 6;
 var WALL_SERVER_X = [480, 1120];
 var WALL_COLS = WALL_SERVER_X.map(function(wx) { return Math.round(wx / MAP_WIDTH * GRID_COLS); });
+var _ZONE_COLORS = { fire:'rgba(255,68,0,0.12)', ice:'rgba(68,187,255,0.12)', wind:'rgba(68,255,136,0.1)' };
+var _ZONE_BORDERS = { fire:'#ff4400', ice:'#44bbff', wind:'#44ff88' };
+var _GRID_ZONE_COLORS = ['#0f2847', '#0d2040', '#0f2847'];
 
 function resizeSurvivalCanvas() {
   if (!survivalCanvas) return;
@@ -104,8 +107,7 @@ function drawSurvivalField(W, H) {
         sCtx.fillText('\uD83E\uDDF1', mx, my + 3);
       } else {
         var zone = c < WALL_COLS[0] ? 0 : c < WALL_COLS[1] ? 1 : 2;
-        var zoneColors = ['#0f2847', '#0d2040', '#0f2847'];
-        sCtx.fillStyle = zoneColors[zone];
+        sCtx.fillStyle = _GRID_ZONE_COLORS[zone];
         sCtx.fill();
         sCtx.strokeStyle = '#1a3a5c';
         sCtx.lineWidth = 0.5;
@@ -141,6 +143,22 @@ function renderSurvivalFrame() {
 
   sCtx.clearRect(0, 0, W, H);
   drawSurvivalField(W, H);
+
+  // 장판(zones) 렌더링 — 캐릭터 아래 레이어
+  if (G.survivalZones && G.survivalZones.length > 0) {
+    for (var zi = 0; zi < G.survivalZones.length; zi++) {
+      var z = G.survivalZones[zi];
+      var zqX = (z.x / 1600) * W, zqY = (z.y / 400) * H;
+      var zR = (z.radius / 1600) * W;
+      sCtx.fillStyle = _ZONE_COLORS[z.visual] || 'rgba(255,255,255,0.08)';
+      sCtx.beginPath(); sCtx.arc(zqX, zqY, zR, 0, Math.PI*2); sCtx.fill();
+      sCtx.strokeStyle = _ZONE_BORDERS[z.visual] || '#fff';
+      sCtx.lineWidth = 1.5;
+      sCtx.globalAlpha = 0.4 + 0.2 * Math.sin(now / 300);
+      sCtx.stroke();
+      sCtx.globalAlpha = 1;
+    }
+  }
 
   var chars = G.survivalChars.filter(function(c) { return c.alive || G.survivalDeathAnims.has(c.id); });
   var totalChars = chars.length;
@@ -201,19 +219,24 @@ function renderSurvivalFrame() {
     sCtx.fill();
   }
 
-  // Draw animations
-  for (var ai = G.survivalAnimations.length - 1; ai >= 0; ai--) {
+  // Draw animations (compact pattern)
+  var writeIdx = 0;
+  for (var ai = 0; ai < G.survivalAnimations.length; ai++) {
     var anim = G.survivalAnimations[ai];
-    if (now - anim.born > anim.duration) {
-      G.survivalAnimations.splice(ai, 1);
-      continue;
-    }
+    if (now - anim.born > anim.duration) continue;
     drawEffect(sCtx, anim, now);
+    if (writeIdx !== ai) G.survivalAnimations[writeIdx] = anim;
+    writeIdx++;
   }
+  G.survivalAnimations.length = writeIdx;
 }
 
 function survivalAnimLoop() {
-  renderSurvivalFrame();
+  try {
+    renderSurvivalFrame();
+  } catch(e) {
+    console.error('survivalRender error:', e);
+  }
   if (G.isSurvivalActive) {
     G.survivalAnimFrameId = requestAnimationFrame(survivalAnimLoop);
   }
@@ -293,6 +316,15 @@ if (hpBarsEl) {
   });
 }
 
+// ─── Survival Position Helper ───
+function _getSurvivalPos(char) {
+  if (!survivalCanvas) return null;
+  var aliveList = G.survivalChars.filter(function(c) { return c.alive || G.survivalDeathAnims.has(c.id); });
+  var idx = aliveList.findIndex(function(c) { return c.id === char.id; });
+  if (idx < 0) return null;
+  return serverToSurvivalQV(char.x, idx, aliveList.length, survivalCanvas.width, survivalCanvas.height);
+}
+
 // ─── Survival Socket Events ───
 G.socket.on('survivalStart', function(data) {
   showScreen('survival-screen');
@@ -303,6 +335,7 @@ G.socket.on('survivalStart', function(data) {
   G.survivalDeadAnimated.clear();
   G.survivalPhase = 1;
   G.survivalActiveZones = [0,1,2,3];
+  G.survivalZones = [];
   G.isSurvivalActive = true;
   var sti = document.getElementById('survivalTickInfo');
   if (sti) sti.textContent = '총 ' + data.totalTicks + '틱';
@@ -318,11 +351,13 @@ G.socket.on('survivalTick', function(data) {
   // 로그 필터는 HP카드 탭으로 직접 토글
   G.survivalPhase = data.phase || 1;
   G.survivalActiveZones = data.activeZones || [0,1,2,3];
+  G.survivalZones = data.zones || [];
 
   // Update HUD
   var player = G.survivalChars.find(function(c) { return c.id === 'p0'; });
   if (player) {
-    document.getElementById('survivalGold').textContent = '\uD83D\uDCB0 ' + (player.gold || 0) + 'G';
+    var goldEl = document.getElementById('survivalGold');
+    if (goldEl) goldEl.textContent = '\uD83D\uDCB0 ' + (player.gold || 0) + 'G';
     var enh = player.enhancementLevels;
     if (enh) {
       var slots = { helmet:'투구', armor:'갑옷', weapon:'무기', boots:'신발' };
@@ -337,17 +372,19 @@ G.socket.on('survivalTick', function(data) {
   var remaining = Math.max(0, 300 - elapsed);
   var min = Math.floor(remaining / 60);
   var sec = Math.floor(remaining % 60);
-  document.getElementById('survivalTimer').textContent = min + ':' + sec.toString().padStart(2,'0');
+  var timerEl = document.getElementById('survivalTimer');
+  if (timerEl) timerEl.textContent = min + ':' + sec.toString().padStart(2,'0');
 
   var phaseLabels = { 1: 'Phase 1 - PvE', 2: 'Phase 2 - 합류', 3: 'Phase 3 - FFA' };
-  document.getElementById('survivalPhase').textContent = phaseLabels[G.survivalPhase] || '';
+  var phaseEl = document.getElementById('survivalPhase');
+  if (phaseEl) phaseEl.textContent = phaseLabels[G.survivalPhase] || '';
 
   if (data.tick) { var sti2 = document.getElementById('survivalTickInfo'); if (sti2) sti2.textContent = '틱: ' + data.tick; }
 
   // HP bars
-  var players = G.survivalChars.filter(function(c) { return !c.isMonster; });
+  var players = G.survivalChars.filter(function(c) { return !c.isMonster && !c.isDecoy; });
   var hpEl = document.getElementById('survivalHpBars');
-  hpEl.innerHTML = players.map(function(c) {
+  if (hpEl) hpEl.innerHTML = players.map(function(c) {
     var pct = Math.max(0, c.hp / c.maxHP * 100);
     var color = c.alive ? (G.classColors[c.className] || '#e94560') : '#555';
     var lives = c.livesRemaining != null ? c.livesRemaining : '?';
@@ -364,15 +401,23 @@ G.socket.on('survivalTick', function(data) {
 
   // Process events
   var events = data.events || [];
+  var _aliveCache = G.survivalChars.filter(function(c) { return c.alive || G.survivalDeathAnims.has(c.id); });
+  var _idxMap = {};
+  for (var _i = 0; _i < _aliveCache.length; _i++) _idxMap[_aliveCache[_i].id] = _i;
+  function _getCachedPos(char) {
+    if (!survivalCanvas || !char) return null;
+    var idx = _idxMap[char.id];
+    if (idx === undefined) return null;
+    return serverToSurvivalQV(char.x, idx, _aliveCache.length, survivalCanvas.width, survivalCanvas.height);
+  }
   for (var ei = 0; ei < events.length; ei++) {
     var evt = events[ei];
     if (evt.type === 'damage' && evt.amount > 0) {
-      var aliveChars = G.survivalChars.filter(function(c) { return c.alive || G.survivalDeathAnims.has(c.id); });
-      var targetIdx = aliveChars.findIndex(function(c) { return c.id === evt.to; });
-      var target = aliveChars[targetIdx];
+      var targetIdx = _idxMap[evt.to];
+      var target = targetIdx !== undefined ? _aliveCache[targetIdx] : undefined;
       var attacker = G.survivalChars.find(function(c) { return c.id === evt.from; });
-      if (target && targetIdx >= 0) {
-        var pos = serverToSurvivalQV(target.x, targetIdx, aliveChars.length, survivalCanvas.width, survivalCanvas.height);
+      if (target && targetIdx !== undefined) {
+        var pos = serverToSurvivalQV(target.x, targetIdx, _aliveCache.length, survivalCanvas.width, survivalCanvas.height);
         G.survivalAnimations.push({ type:'damage', x:pos.qvX, y:pos.qvY-15, startY:pos.qvY-15, amount:evt.amount, isSkill:!!evt.skill, isCrit:!!evt.crit, born:performance.now(), duration:evt.crit?1200:1000 });
       }
       if (evt.amount >= 5 || evt.skill || evt.crit) {
@@ -384,11 +429,10 @@ G.socket.on('survivalTick', function(data) {
     }
     if (evt.type === 'death' && !G.survivalDeadAnimated.has(evt.target)) {
       G.survivalDeadAnimated.add(evt.target);
-      var aliveChars2 = G.survivalChars.filter(function(c) { return c.alive || G.survivalDeathAnims.has(c.id); });
-      var cIdx = aliveChars2.findIndex(function(ch) { return ch.id === evt.target; });
-      var dc = aliveChars2[cIdx];
-      if (dc && cIdx >= 0) {
-        var dpos = serverToSurvivalQV(dc.x, cIdx, aliveChars2.length, survivalCanvas.width, survivalCanvas.height);
+      var cIdx = _idxMap[evt.target];
+      var dc = cIdx !== undefined ? _aliveCache[cIdx] : undefined;
+      if (dc && cIdx !== undefined) {
+        var dpos = serverToSurvivalQV(dc.x, cIdx, _aliveCache.length, survivalCanvas.width, survivalCanvas.height);
         G.survivalDeathAnims.set(evt.target, { born:performance.now(), duration:800 });
         var killer = evt.killedBy ? G.survivalChars.find(function(ch) { return ch.id === evt.killedBy; }) : null;
         if (dc.isMonster) {
@@ -413,6 +457,75 @@ G.socket.on('survivalTick', function(data) {
       var caster = G.survivalChars.find(function(c) { return c.id === evt.caster; });
       if (caster && !caster.isMonster) {
         survivalLogAdd('\u2728 ' + caster.name + ' [' + evt.skillName + '] 사용', null, true);
+      }
+      // 비주얼 이펙트
+      if (caster) {
+        var sPos = _getCachedPos(caster);
+        if (sPos) {
+          G.survivalAnimations.push({ type:'skillName', x:sPos.qvX, y:sPos.qvY-30, startY:sPos.qvY-30, text:evt.skillName, born:performance.now(), duration:900 });
+          if (evt.aoe) {
+            spawnAoeEffect(G.survivalAnimations, sPos.qvX, sPos.qvY, G.classColors[caster.className] || '#7ec8e3');
+          } else if (evt.skillType === 'defense' || evt.skillType === 'buff') {
+            spawnBuffEffect(G.survivalAnimations, sPos.qvX, sPos.qvY, G.classColors[caster.className] || '#3498db');
+          } else {
+            // 단일 대상 공격 → 투사체
+            var sDmg = events.find(function(e) { return e.type === 'damage' && e.skill && e.from === evt.caster; });
+            if (sDmg) {
+              var sTgt = G.survivalChars.find(function(c) { return c.id === sDmg.to; });
+              if (sTgt) {
+                var sTpos = _getCachedPos(sTgt);
+                if (sTpos) spawnProjectile(G.survivalAnimations, sPos.qvX, sPos.qvY, sTpos.qvX, sTpos.qvY, G.classColors[caster.className] || '#fff');
+              }
+            }
+          }
+          if (typeof spawnSkillEffect === 'function') {
+            spawnSkillEffect(G.survivalAnimations, evt.skillName, sPos.qvX, sPos.qvY);
+          }
+        }
+      }
+    }
+    // 넉백 이펙트
+    if (evt.type === 'knockback') {
+      var kbTarget = G.survivalChars.find(function(c) { return c.id === evt.target; });
+      if (kbTarget) {
+        var kbPos = _getCachedPos(kbTarget);
+        if (kbPos && typeof spawnKnockbackEffect === 'function') spawnKnockbackEffect(G.survivalAnimations, kbPos.qvX, kbPos.qvY);
+      }
+    }
+    // 기절 이펙트
+    if (evt.type === 'stun') {
+      var stTarget = G.survivalChars.find(function(c) { return c.id === evt.target; });
+      if (stTarget) {
+        var stPos = _getCachedPos(stTarget);
+        if (stPos && typeof spawnStunEffect === 'function') spawnStunEffect(G.survivalAnimations, stPos.qvX, stPos.qvY - 25, evt.duration * 200);
+      }
+    }
+    // DOT 적용 이펙트
+    if (evt.type === 'dotApply') {
+      var dotTarget = G.survivalChars.find(function(c) { return c.id === evt.target; });
+      if (dotTarget) {
+        var dotPos = _getCachedPos(dotTarget);
+        if (dotPos && typeof spawnDotEffect === 'function') spawnDotEffect(G.survivalAnimations, dotPos.qvX, dotPos.qvY, evt.name);
+      }
+    }
+    // 텔레포트 이펙트
+    if (evt.type === 'teleport') {
+      var sW = survivalCanvas.width, sH = survivalCanvas.height;
+      var fromQX = (evt.fromX / 1600) * sW, toQX = (evt.toX / 1600) * sW, midY = sH * 0.5;
+      G.survivalAnimations.push({ type:'teleport', fromX:fromQX, fromY:midY, toX:toQX, toY:midY, color:'#8844aa', born:performance.now(), duration:600 });
+    }
+    // 대시 이펙트
+    if (evt.type === 'dash') {
+      var dsW = survivalCanvas.width, dsH = survivalCanvas.height;
+      var dFromQX = (evt.fromX / 1600) * dsW, dToQX = (evt.toX / 1600) * dsW, dMidY = dsH * 0.5;
+      G.survivalAnimations.push({ type:'dash', fromX:dFromQX, fromY:dMidY, toX:dToQX, toY:dMidY, color:'#ffcc44', born:performance.now(), duration:400 });
+    }
+    // 회피 표시
+    if (evt.type === 'dodge') {
+      var dodgeTarget = G.survivalChars.find(function(c) { return c.id === evt.target; });
+      if (dodgeTarget) {
+        var dodgePos = _getCachedPos(dodgeTarget);
+        if (dodgePos) G.survivalAnimations.push({ type:'skillName', x:dodgePos.qvX, y:dodgePos.qvY-20, startY:dodgePos.qvY-20, text:'DODGE!', born:performance.now(), duration:700 });
       }
     }
     if (evt.type === 'waveSpawn') {
@@ -460,15 +573,15 @@ G.socket.on('survivalEnd', function(data) {
     var rankClass = r.rank <= 3 ? 'rank-' + r.rank : '';
     var enh = r.enhancementLevels || {};
     var enhTotal = Object.values(enh).reduce(function(a,b){return a+b;}, 0);
-    var bossTag = r.bossKiller ? '<div style="color:#ffd700;font-weight:bold">\uD83D\uDC51 보스 처치자!</div>' : '';
+    var bossTag = r.bossKiller ? '<div class="result-gold-text result-bold">\uD83D\uDC51 보스 처치자!</div>' : '';
     return '<div class="result-card">' +
       '<div class="rank ' + rankClass + '">' + r.rank + '등</div>' +
       '<div>' +
-        '<div style="font-weight:bold">' + esc(r.name) + ' (' + esc(r.className) + ')</div>' +
+        '<div class="result-bold">' + esc(r.name) + ' (' + esc(r.className) + ')</div>' +
         bossTag +
-        '<div style="color:#aaa">HP: ' + r.hpRemaining + ' | 킬: ' + (r.monstersKilled || 0) + '마리 | 목숨: ' + (r.livesRemaining != null ? r.livesRemaining : '?') + '</div>' +
-        '<div style="color:#f0a500">강화 Lv' + enhTotal + ' (' + (enh.helmet||0) + '/' + (enh.armor||0) + '/' + (enh.weapon||0) + '/' + (enh.boots||0) + ')</div>' +
-        '<div style="color:#f0a500">+' + (r.gold || 0) + 'G</div>' +
+        '<div class="result-stat-text">HP: ' + r.hpRemaining + ' | 킬: ' + (r.monstersKilled || 0) + '마리 | 목숨: ' + (r.livesRemaining != null ? r.livesRemaining : '?') + '</div>' +
+        '<div class="result-gold-text">강화 Lv' + enhTotal + ' (' + (enh.helmet||0) + '/' + (enh.armor||0) + '/' + (enh.weapon||0) + '/' + (enh.boots||0) + ')</div>' +
+        '<div class="result-gold-text">+' + (r.gold || 0) + 'G</div>' +
       '</div>' +
     '</div>';
   }).join('');
@@ -498,6 +611,7 @@ function showRewardUI(rewards) {
 
   var html = '<div class="reward-title">⭐ 웨이브 클리어! 보상을 선택하세요</div>';
   html += '<div class="reward-timer" id="rewardTimerText">8</div>';
+  html += '<div class="reward-reroll-wrap"><button class="btn btn-secondary btn-sm" id="rerollRewardBtn">🔄 리롤</button></div>';
   html += '<div class="reward-cards">';
   rewards.forEach(function(r, idx) {
     html += '<div class="reward-card" data-idx="' + idx + '">';
@@ -509,7 +623,7 @@ function showRewardUI(rewards) {
   overlay.innerHTML = html;
   overlay.style.display = 'flex';
 
-  // 클릭 핸들러
+  // 카드 클릭 핸들러
   overlay.querySelectorAll('.reward-card').forEach(function(card) {
     card.addEventListener('click', function() {
       var idx = parseInt(card.dataset.idx);
@@ -518,6 +632,15 @@ function showRewardUI(rewards) {
       hideRewardUI();
     });
   });
+
+  // 리롤 버튼 핸들러
+  var rerollBtn = document.getElementById('rerollRewardBtn');
+  if (rerollBtn) {
+    rerollBtn.addEventListener('click', function() {
+      G.socket.emit('rerollReward');
+      survivalLogAdd('🔄 보상 리롤!');
+    });
+  }
 
   // 타이머
   var remaining = 8;

@@ -182,7 +182,7 @@ G.socket.on('battleTick', function(data) {
   G.battleChars = data.state;
 
   var hpEl = document.getElementById('hpBars');
-  hpEl.innerHTML = G.battleChars.map(function(c) {
+  hpEl.innerHTML = G.battleChars.filter(function(c) { return !c.isDecoy; }).map(function(c) {
     var pct = Math.max(0, c.hp / c.maxHP * 100);
     var color = c.alive ? (G.classColors[c.className] || '#e94560') : '#555';
     return '<div class="hp-bar-container">' +

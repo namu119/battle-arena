@@ -7,21 +7,29 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Battle Arena</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚔️</text></svg>">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
   <!-- 로딩 오버레이 -->
-  <div id="loading-overlay">데이터 로딩중...</div>
+  <div id="loading-overlay">
+    <div class="loading-spinner"></div>
+    데이터 로딩중...
+  </div>
 
   <!-- 로비 -->
   <div id="lobby">
-    <h1>Battle Arena</h1>
-    <h3 style="color:#7ec8e3">서바이벌 아레나</h3>
+    <div class="lobby-hero">
+      <h1>Battle Arena</h1>
+      <h3 class="lobby-subtitle">서바이벌 아레나</h3>
+    </div>
     <input id="playerName" placeholder="닉네임" maxlength="10" value="">
-    <button class="btn" onclick="quickStart()">빠른 시작</button>
-    <div id="roomList"></div>
-    <button class="btn btn-secondary" onclick="createNewRoom()">+ 새 방 만들기</button>
+    <div class="lobby-actions">
+      <button class="btn" onclick="quickStart()">빠른 시작</button>
+      <div id="roomList"></div>
+      <button class="btn btn-secondary" onclick="createNewRoom()">+ 새 방 만들기</button>
+    </div>
   </div>
 
   <!-- 대기실 -->
@@ -30,12 +38,14 @@
     <div id="roomSlots" class="room-slots">
       <!-- 4 slot cards rendered by JS -->
     </div>
-    <button class="btn" id="startGameBtn" onclick="startGame()" disabled>시작!</button>
+    <div class="room-start-actions">
+      <button class="btn" id="startGameBtn" onclick="startGame()" disabled>시작!</button>
+    </div>
   </div>
 
   <!-- 캐릭터 제작소: 랜덤 인생 -->
   <div id="workshop">
-    <h2 style="padding:12px 0 4px;text-align:center">🎲 랜덤 인생</h2>
+    <h2 class="workshop-title">🎲 랜덤 인생</h2>
     <div id="workshopBudget">
       <div class="gold-display">💰 <span id="goldDisplay">1000</span>G</div>
       <div class="reroll-display">🔄 리롤: <span id="rerollCount">10</span></div>
@@ -44,32 +54,32 @@
     <!-- 단계별 위저드 -->
     <div class="shop-section" id="wizardStep">
       <div id="wizardContent"></div>
-      <div id="wizardActions" style="display:flex;gap:10px;justify-content:center;margin-top:12px">
+      <div id="wizardActions" class="wizard-actions">
         <button class="btn btn-secondary" id="rerollBtn" onclick="wizardReroll()">🔄 리롤</button>
         <button class="btn" id="confirmBtn" onclick="wizardConfirm()">✅ 확정</button>
       </div>
-      <div id="wizardTimer" style="text-align:center;margin-top:8px;color:#e94560;font-weight:bold;font-size:1.2em"></div>
+      <div id="wizardTimer" class="wizard-timer"></div>
     </div>
 
     <!-- 레이더 차트 -->
-    <div class="shop-section" id="radarSection" style="display:none;text-align:center">
-      <canvas id="statRadar" width="220" height="220" style="margin:0 auto;display:block"></canvas>
+    <div class="shop-section radar-section" id="radarSection" style="display:none">
+      <canvas id="statRadar" width="220" height="220"></canvas>
     </div>
 
     <div id="workshopCta" style="display:none">
-      <button class="btn" id="submitBtn" onclick="submitBuild()" style="width:100%;font-size:1.1em;padding:14px;font-weight:bold">⚔️ 출전!</button>
+      <button class="btn workshop-submit-btn" id="submitBtn" onclick="submitBuild()">⚔️ 출전!</button>
     </div>
   </div>
 
   <!-- 전투 화면 -->
   <div id="battle-screen">
-    <div style="display:flex;align-items:center;gap:10px;margin:10px auto;width:100%;max-width:800px">
-      <h2 style="margin:0">전투 진행중</h2>
-      <button class="btn btn-secondary" id="speedBtn" style="padding:6px 12px;font-size:13px">1x</button>
+    <div class="battle-header">
+      <h2 class="battle-title">전투 진행중</h2>
+      <button class="btn btn-secondary battle-speed-btn" id="speedBtn">1x</button>
     </div>
     <div class="hp-bars" id="hpBars"></div>
     <canvas id="battle-canvas"></canvas>
-    <div id="tickInfo" style="margin:10px auto;color:#aaa;width:100%;max-width:800px;text-align:center"></div>
+    <div id="tickInfo" class="tick-info"></div>
   </div>
 
   <!-- 서바이벌 전투 화면 -->
@@ -78,7 +88,7 @@
       <div class="survival-hud-row">
         <div class="survival-timer" id="survivalTimer">5:00</div>
         <div class="survival-phase" id="survivalPhase">Phase 1 - PvE</div>
-        <button class="btn btn-secondary" id="survivalSpeedBtn" style="padding:6px 12px;font-size:13px">1x</button>
+        <button class="btn btn-secondary survival-speed-btn" id="survivalSpeedBtn">1x</button>
       </div>
       <div class="survival-hud-row">
         <div class="survival-gold" id="survivalGold">💰 0G</div>
@@ -91,7 +101,7 @@
       </div>
     </div>
     <div id="survivalTickInfo" class="survival-tick-info"></div>
-    <div style="position:relative;width:100%;max-width:800px">
+    <div class="survival-canvas-wrap">
       <canvas id="survival-canvas"></canvas>
     </div>
     <!-- HP바: 하단 4명 일렬 -->
@@ -100,13 +110,19 @@
     <div class="survival-log-wrap">
       <div id="survivalLog" class="survival-log"></div>
     </div>
+    <!-- PvP 성향 전환 -->
+    <div class="pvp-stance-bar">
+      <button class="pvp-stance-btn" id="stancePassive" onclick="setPvpStance('passive')">🤝 협력</button>
+      <button class="pvp-stance-btn active" id="stanceRetaliate" onclick="setPvpStance('retaliate')">🔄 반격</button>
+      <button class="pvp-stance-btn" id="stanceHostile" onclick="setPvpStance('hostile')">⚔️ 적대</button>
+    </div>
   </div>
 
   <!-- 결과 화면 -->
   <div id="result-screen">
     <h2>전투 결과</h2>
     <div id="resultCards"></div>
-    <button class="btn" onclick="backToLobby()" style="margin-top:20px">로비로 돌아가기</button>
+    <button class="btn result-lobby-btn" onclick="backToLobby()">로비로 돌아가기</button>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
