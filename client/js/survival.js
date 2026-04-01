@@ -186,38 +186,66 @@ function renderSurvivalFrame() {
     }
   }
 
-  // Minimap
-  var mmW = isMobile ? Math.min(W * 0.28, 90) : W * 0.2;
-  var mmH = isMobile ? 20 : H * 0.12;
-  var mmX = 6;
-  var mmY = 6;
-  sCtx.fillStyle = 'rgba(0,0,0,0.5)';
-  sCtx.fillRect(mmX, mmY, mmW, mmH);
-  sCtx.strokeStyle = 'rgba(255,255,255,0.3)';
+  // Minimap (isometric diamond - matches main field)
+  var mmSize = isMobile ? Math.min(W * 0.22, 70) : W * 0.16;
+  var mmCx = mmSize * 0.55 + 6;
+  var mmCy = mmSize * 0.35 + 6;
+  var mmDw = mmSize * 0.48;
+  var mmDh = mmSize * 0.28;
+
+  // Diamond background
+  sCtx.fillStyle = 'rgba(0,0,0,0.55)';
+  sCtx.beginPath();
+  sCtx.moveTo(mmCx, mmCy - mmDh);
+  sCtx.lineTo(mmCx + mmDw, mmCy);
+  sCtx.lineTo(mmCx, mmCy + mmDh);
+  sCtx.lineTo(mmCx - mmDw, mmCy);
+  sCtx.closePath();
+  sCtx.fill();
+  sCtx.strokeStyle = 'rgba(255,255,255,0.25)';
   sCtx.lineWidth = 1;
-  sCtx.strokeRect(mmX, mmY, mmW, mmH);
+  sCtx.stroke();
+
+  // Wall columns (isometric strips)
   for (var wi = 0; wi < WALL_SERVER_X.length; wi++) {
-    var wallX = WALL_SERVER_X[wi];
-    var wx = mmX + (wallX / MAP_WIDTH) * mmW;
-    var ww = mmW / GRID_COLS;
-    sCtx.fillStyle = 'rgba(233,69,96,0.4)';
-    sCtx.fillRect(wx - ww/2, mmY, ww, mmH);
+    var wnx = (WALL_SERVER_X[wi] / MAP_WIDTH) * 2 - 1;
+    sCtx.strokeStyle = 'rgba(233,69,96,0.6)';
+    sCtx.lineWidth = 1.5;
+    sCtx.beginPath();
+    sCtx.moveTo(mmCx + (wnx - (-1)) * mmDw * 0.5, mmCy + (wnx + (-1)) * mmDh * 0.5);
+    sCtx.lineTo(mmCx + (wnx - 1) * mmDw * 0.5, mmCy + (wnx + 1) * mmDh * 0.5);
+    sCtx.stroke();
   }
-  var vpLeft = mmX + ((G.cameraX - 400) / MAP_WIDTH) * mmW;
-  var vpW = (800 / MAP_WIDTH) * mmW;
-  sCtx.strokeStyle = 'rgba(255,255,255,0.5)';
-  sCtx.strokeRect(Math.max(mmX, vpLeft), mmY, Math.min(vpW, mmW), mmH);
+
+  // Viewport indicator
+  var vpL = ((G.cameraX - 400) / MAP_WIDTH) * 2 - 1;
+  var vpR = ((G.cameraX + 400) / MAP_WIDTH) * 2 - 1;
+  vpL = Math.max(-1, vpL); vpR = Math.min(1, vpR);
+  sCtx.strokeStyle = 'rgba(255,255,255,0.45)';
+  sCtx.lineWidth = 1;
+  sCtx.beginPath();
+  sCtx.moveTo(mmCx + (vpL - (-0.5)) * mmDw * 0.5, mmCy + (vpL + (-0.5)) * mmDh * 0.5);
+  sCtx.lineTo(mmCx + (vpR - (-0.5)) * mmDw * 0.5, mmCy + (vpR + (-0.5)) * mmDh * 0.5);
+  sCtx.lineTo(mmCx + (vpR - 0.5) * mmDw * 0.5, mmCy + (vpR + 0.5) * mmDh * 0.5);
+  sCtx.lineTo(mmCx + (vpL - 0.5) * mmDw * 0.5, mmCy + (vpL + 0.5) * mmDh * 0.5);
+  sCtx.closePath();
+  sCtx.stroke();
+
+  // Character dots (isometric positions)
   for (var ci = 0; ci < G.survivalChars.length; ci++) {
     var mc = G.survivalChars[ci];
-    if (!mc.alive) continue;
-    var dotX = mmX + (mc.x / MAP_WIDTH) * mmW;
-    var dotY = mmY + mmH * 0.5;
+    if (!mc.alive || mc.isDecoy) continue;
+    var mnx = (mc.x / MAP_WIDTH) * 2 - 1;
+    var mny = (mc.y / 400) * 2 - 1;
+    var mdx = mmCx + (mnx - mny) * mmDw * 0.5;
+    var mdy = mmCy + (mnx + mny) * mmDh * 0.5;
     sCtx.fillStyle = mc.isMonster ? (mc.isBoss ? '#ff0000' : '#ff8800') : (G.classColors[mc.className] || '#fff');
-    var dotR = mc.isMonster ? (mc.isBoss ? 3 : 1.5) : 2.5;
+    var dotR = mc.isMonster ? (mc.isBoss ? 2.5 : 1.2) : 2;
     sCtx.beginPath();
-    sCtx.arc(dotX, dotY, dotR, 0, Math.PI * 2);
+    sCtx.arc(mdx, mdy, dotR, 0, Math.PI * 2);
     sCtx.fill();
   }
+
 
   // Draw animations (compact pattern)
   var writeIdx = 0;
