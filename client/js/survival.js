@@ -6,6 +6,10 @@ var sCtx = survivalCanvas ? survivalCanvas.getContext('2d') : null;
 var ZONE_COLORS = ['#e94560','#7b2ff7','#2ecc71','#f39c12'];
 var ZONE_LABELS = ['A','B','C','D'];
 var CAMERA_SMOOTH = 0.1;
+var ZOOM_MIN = 0.6;
+var ZOOM_MAX = 2.0;
+var ZOOM_STEP = 0.15;
+var ZOOM_SMOOTH = 0.1;
 var MAP_WIDTH = 1600;
 var GRID_COLS = 10;
 var GRID_ROWS = 6;
@@ -39,6 +43,34 @@ if (survivalSpeedBtn) {
 
 if (survivalCanvas) {
   resizeSurvivalCanvas();
+  // 카메라 줌: 마우스 휠
+  survivalCanvas.addEventListener('wheel', function(e) {
+    e.preventDefault();
+    if (!G.isSurvivalActive) return;
+    var delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
+    G.cameraZoomTarget = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, (G.cameraZoomTarget || 1) + delta));
+  }, { passive: false });
+  // 카메라 줌: 핀치 (모바일)
+  var _lastPinchDist = 0;
+  survivalCanvas.addEventListener('touchstart', function(e) {
+    if (e.touches.length === 2) {
+      var dx = e.touches[0].clientX - e.touches[1].clientX;
+      var dy = e.touches[0].clientY - e.touches[1].clientY;
+      _lastPinchDist = Math.sqrt(dx*dx + dy*dy);
+    }
+  });
+  survivalCanvas.addEventListener('touchmove', function(e) {
+    if (e.touches.length === 2 && _lastPinchDist > 0) {
+      e.preventDefault();
+      var dx = e.touches[0].clientX - e.touches[1].clientX;
+      var dy = e.touches[0].clientY - e.touches[1].clientY;
+      var dist = Math.sqrt(dx*dx + dy*dy);
+      var scale = dist / _lastPinchDist;
+      G.cameraZoomTarget = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, (G.cameraZoomTarget || 1) * scale));
+      _lastPinchDist = dist;
+    }
+  }, { passive: false });
+  survivalCanvas.addEventListener('touchend', function() { _lastPinchDist = 0; });
   window.addEventListener('resize', function() {
     resizeSurvivalCanvas();
     if (G.survivalChars.length > 0 && !G.isSurvivalActive) renderSurvivalFrame();
@@ -141,7 +173,20 @@ function renderSurvivalFrame() {
     G.cameraX += (targetCam - G.cameraX) * CAMERA_SMOOTH;
   }
 
+  // 줌 스무딩
+  G.cameraZoom = G.cameraZoom || 1;
+  G.cameraZoomTarget = G.cameraZoomTarget || 1;
+  G.cameraZoom += (G.cameraZoomTarget - G.cameraZoom) * ZOOM_SMOOTH;
+  var zoom = G.cameraZoom;
+
   sCtx.clearRect(0, 0, W, H);
+
+  // 줌 적용: 캔버스 중심 기준 스케일
+  sCtx.save();
+  sCtx.translate(W/2, H/2);
+  sCtx.scale(zoom, zoom);
+  sCtx.translate(-W/2, -H/2);
+
   drawSurvivalField(W, H);
 
   // 장판(zones) 렌더링 — 캐릭터 아래 레이어
@@ -185,6 +230,16 @@ function renderSurvivalFrame() {
     } else {
       drawCharacter(sCtx, item.char, item.qvX, item.qvY, scale, deathProgress);
     }
+  }
+
+  sCtx.restore(); // 줌 transform 종료
+
+  // 줌 레벨 표시 (1.0x가 아닐 때만)
+  if (Math.abs(zoom - 1.0) > 0.05) {
+    sCtx.fillStyle = 'rgba(255,255,255,0.5)';
+    sCtx.font = '11px sans-serif';
+    sCtx.textAlign = 'right';
+    sCtx.fillText(zoom.toFixed(1) + 'x', W - 8, H - 8);
   }
 
   // Minimap (isometric diamond - matches main field)
@@ -383,6 +438,8 @@ G.socket.on('survivalStart', function(data) {
   G.survivalActiveZones = [0,1,2,3];
   G.survivalZones = [];
   G.isSurvivalActive = true;
+  G.cameraZoom = 1.0;
+  G.cameraZoomTarget = 1.0;
   var sti = document.getElementById('survivalTickInfo');
   if (sti) sti.textContent = '총 ' + data.totalTicks + '틱';
   G.logEntries = [];
