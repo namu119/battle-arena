@@ -1645,3 +1645,11 @@ input::placeholder {
   border-color: #fff;
   box-shadow: 0 0 8px rgba(255,255,255,0.4);
 }
+
+.signal-color-bar.on-cooldown .signal-btn {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.signal-color-bar.on-cooldown .signal-label {
+  color: var(--red);
+}

@@ -435,14 +435,22 @@ io.on('connection', (socket) => {
     }
   });
 
-  // 시그널 색상 변경
+  // 시그널 색상 변경 (5초 쿨다운)
+  let signalCooldown = 0;
   socket.on('setSignalColor', (color) => {
     const validColors = ['none', 'red', 'blue', 'green', 'yellow', 'purple'];
     if (!validColors.includes(color)) return;
     if (!currentArena) return;
+    const now = Date.now();
+    if (now < signalCooldown) {
+      socket.emit('signalCooldown', Math.ceil((signalCooldown - now) / 1000));
+      return;
+    }
     const char = currentArena.engine.characters.find(c => c.id === 'p0');
     if (char) {
       char.signalColor = color;
+      signalCooldown = now + 5000;
+      socket.emit('signalColorChanged', color);
       console.log(`시그널 색상: ${char.name} → ${color}`);
     }
   });

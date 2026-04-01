@@ -223,13 +223,39 @@ function setPvpStance(stance) {
   if (active) active.classList.add('active');
 }
 
-// Signal color
+// Signal color (5s cooldown)
+var _signalCooldown = false;
 function setSignalColor(color) {
-  G.signalColor = color;
+  if (_signalCooldown) return;
   G.socket.emit('setSignalColor', color);
+}
+
+G.socket.on('signalColorChanged', function(color) {
+  G.signalColor = color;
   var btns = document.querySelectorAll('.signal-btn');
   for (var i = 0; i < btns.length; i++) {
     btns[i].classList.remove('active');
     if (btns[i].dataset.color === color) btns[i].classList.add('active');
   }
-}
+  // 쿨다운 UI
+  _signalCooldown = true;
+  var bar = document.querySelector('.signal-color-bar');
+  if (bar) bar.classList.add('on-cooldown');
+  var label = document.querySelector('.signal-label');
+  var remaining = 5;
+  if (label) label.textContent = '시그널 ' + remaining + 's';
+  var cdTimer = setInterval(function() {
+    remaining--;
+    if (label) label.textContent = remaining > 0 ? '시그널 ' + remaining + 's' : '시그널:';
+    if (remaining <= 0) {
+      clearInterval(cdTimer);
+      _signalCooldown = false;
+      if (bar) bar.classList.remove('on-cooldown');
+    }
+  }, 1000);
+});
+
+G.socket.on('signalCooldown', function(sec) {
+  var label = document.querySelector('.signal-label');
+  if (label) label.textContent = '대기 ' + sec + 's';
+});
