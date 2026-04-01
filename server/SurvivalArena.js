@@ -387,6 +387,7 @@ class SurvivalArena {
         level: c.level || 0,
         gold: c.gold || 0,
         enhancementLevels: c.enhancementLevels || null,
+        livesRemaining: this.respawnLives.get(c.id) || 0,
       })),
       events: [...(this.engine.tickEvents || []), ...this.metaEvents],
     });
