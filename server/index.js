@@ -429,7 +429,6 @@ io.on('connection', (socket) => {
     }, TICK_INTERVAL / (Game_speed || 1));
   }
 
-  let Game_speed = 1;
   // 배속 업데이트
   socket.on('setSpeed', (speed) => {
     const validSpeeds = [1, 2, 4];
