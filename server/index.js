@@ -332,7 +332,9 @@ io.on('connection', (socket) => {
   let currentRoom = null;
   let rewardTimeout = null;
 
+  let Game_speed = 1;
   function startSurvivalFromRoom(room) {
+    if (activeInterval) { clearInterval(activeInterval); activeInterval = null; }
     try {
       room.state = 'playing';
       currentRoom = room;

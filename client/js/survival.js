@@ -148,7 +148,8 @@ function renderSurvivalFrame() {
   if (G.survivalZones && G.survivalZones.length > 0) {
     for (var zi = 0; zi < G.survivalZones.length; zi++) {
       var z = G.survivalZones[zi];
-      var zqX = (z.x / 1600) * W, zqY = (z.y / 400) * H;
+      var zIso = serverToSurvivalQV(z.x, 0, 1, W, H);
+      var zqX = zIso.qvX, zqY = zIso.qvY;
       var zR = (z.radius / 1600) * W;
       sCtx.fillStyle = _ZONE_COLORS[z.visual] || 'rgba(255,255,255,0.08)';
       sCtx.beginPath(); sCtx.arc(zqX, zqY, zR, 0, Math.PI*2); sCtx.fill();
@@ -541,14 +542,16 @@ G.socket.on('survivalTick', function(data) {
     // 텔레포트 이펙트
     if (evt.type === 'teleport') {
       var sW = survivalCanvas.width, sH = survivalCanvas.height;
-      var fromQX = (evt.fromX / 1600) * sW, toQX = (evt.toX / 1600) * sW, midY = sH * 0.5;
-      G.survivalAnimations.push({ type:'teleport', fromX:fromQX, fromY:midY, toX:toQX, toY:midY, color:'#8844aa', born:performance.now(), duration:600 });
+      var tpFrom = serverToSurvivalQV(evt.fromX, 0, 1, sW, sH);
+      var tpTo = serverToSurvivalQV(evt.toX, 0, 1, sW, sH);
+      G.survivalAnimations.push({ type:'teleport', fromX:tpFrom.qvX, fromY:tpFrom.qvY, toX:tpTo.qvX, toY:tpTo.qvY, color:'#8844aa', born:performance.now(), duration:600 });
     }
     // 대시 이펙트
     if (evt.type === 'dash') {
       var dsW = survivalCanvas.width, dsH = survivalCanvas.height;
-      var dFromQX = (evt.fromX / 1600) * dsW, dToQX = (evt.toX / 1600) * dsW, dMidY = dsH * 0.5;
-      G.survivalAnimations.push({ type:'dash', fromX:dFromQX, fromY:dMidY, toX:dToQX, toY:dMidY, color:'#ffcc44', born:performance.now(), duration:400 });
+      var dashFrom = serverToSurvivalQV(evt.fromX, 0, 1, dsW, dsH);
+      var dashTo = serverToSurvivalQV(evt.toX, 0, 1, dsW, dsH);
+      G.survivalAnimations.push({ type:'dash', fromX:dashFrom.qvX, fromY:dashFrom.qvY, toX:dashTo.qvX, toY:dashTo.qvY, color:'#ffcc44', born:performance.now(), duration:400 });
     }
     // 회피 표시
     if (evt.type === 'dodge') {

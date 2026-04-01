@@ -208,6 +208,7 @@ class SurvivalArena {
   /** 보상 선택 완료 (인터랙티브 모드) */
   clearRewards() {
     this.pendingRewards = null;
+    this._rerollCount = 0;
     this._lastMonsterCount = this.engine.characters.filter(c => c.isMonster && c.alive && !c.isBoss && !c.isGatekeeper).length;
   }
 
@@ -412,6 +413,7 @@ class SurvivalArena {
         isMonster: !!c.isMonster,
         isDecoy: !!c.isDecoy,
         signalColor: c.signalColor || "none",
+        pvpStance: c.pvpStance || 'retaliate',
         level: c.level || 0,
         gold: c.gold || 0,
         enhancementLevels: c.enhancementLevels || null,
