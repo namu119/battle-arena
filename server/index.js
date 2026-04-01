@@ -305,6 +305,14 @@ io.on('connection', (socket) => {
 
   // ─── 서바이벌 실행 (방에서 트리거) ───
   // 보상 선택 소켓
+  socket.on('rerollReward', () => {
+    if (!currentArena || !currentArena.pendingRewards) return;
+    const newRewards = currentArena.rerollRewards();
+    if (newRewards) {
+      socket.emit('rewardChoice', { rewards: newRewards });
+    }
+  });
+
   socket.on('selectReward', ({ rewardIndex }) => {
     if (!currentArena || !currentArena.pendingRewards) return;
     const playerId = 'p0'; // 인간 플레이어는 항상 p0
@@ -413,6 +421,18 @@ io.on('connection', (socket) => {
   socket.on('setSpeed', (speed) => {
     const validSpeeds = [1, 2, 4];
     if (validSpeeds.includes(speed)) Game_speed = speed;
+  });
+
+  // PvP 성향 변경 (전투 중)
+  socket.on('setPvpStance', (stance) => {
+    const valid = ['passive', 'hostile', 'retaliate'];
+    if (!valid.includes(stance)) return;
+    if (!currentArena) return;
+    const char = currentArena.engine.characters.find(c => c.id === 'p0');
+    if (char) {
+      char.pvpStance = stance;
+      console.log(`PvP 성향 변경: ${char.name} → ${stance}`);
+    }
   });
 
   function resumeSurvival() {

@@ -3,68 +3,126 @@
     "화염투구": {
       "slot": "helmet", "cost": 150,
       "stats": { "ATK": 3, "DEF": 2 },
-      "skill": { "name": "화염방벽", "type": "defense", "damage": 0, "shield": 20, "cooldown": 8, "description": "불의 방벽으로 피해 흡수" }
+      "skill": {
+        "name": "화염방벽", "type": "zone", "cooldown": 10,
+        "zone": { "radius": 80, "duration": 8, "tickDamage": 8, "visual": "fire" },
+        "description": "불타는 벽 설치. 진입한 적에게 틱당 데미지"
+      }
     },
     "얼음투구": {
       "slot": "helmet", "cost": 150,
       "stats": { "ATK": 1, "DEF": 4 },
-      "skill": { "name": "빙결보호막", "type": "defense", "damage": 0, "shield": 30, "cooldown": 10, "description": "얼음 보호막 생성" }
+      "skill": {
+        "name": "빙결장판", "type": "zone", "cooldown": 12,
+        "zone": { "radius": 100, "duration": 6, "tickDamage": 5, "slow": 0.5, "visual": "ice" },
+        "shield": 15,
+        "description": "얼음 장판. 적 슬로우 50% + 틱 데미지 + 쉴드"
+      }
     },
     "바람투구": {
       "slot": "helmet", "cost": 200,
       "stats": { "ATK": 2, "DEF": 2, "SPD": 2 },
-      "skill": { "name": "질풍회피", "type": "buff", "damage": 0, "duration": 5, "cooldown": 12, "description": "회피율 대폭 상승" }
+      "skill": {
+        "name": "질풍회피", "type": "buff", "cooldown": 10,
+        "duration": 6, "dodge": 0.4,
+        "trail": { "duration": 5, "slow": 0.35, "radius": 50, "visual": "wind" },
+        "description": "회피 40% + 바람 잔상 (적 슬로우 35%)"
+      }
     }
   },
   "armors": {
     "가죽갑옷": {
       "slot": "armor", "cost": 150,
       "stats": { "DEF": 4, "SPD": 1 },
-      "skill": { "name": "긴급회피", "type": "defense", "damage": 0, "shield": 25, "cooldown": 6, "description": "보호막 생성" }
+      "skill": {
+        "name": "그림자 도약", "type": "movement", "cooldown": 8,
+        "teleportDistance": 120, "direction": "away",
+        "decoy": { "duration": 5, "hp": 50 },
+        "description": "순간이동 + 잔상(미끼 HP50)"
+      }
     },
     "철갑옷": {
       "slot": "armor", "cost": 200,
       "stats": { "DEF": 8 },
-      "skill": { "name": "철벽방어", "type": "defense", "damage": 0, "shield": 40, "cooldown": 12, "description": "강력한 방어 태세" }
+      "skill": {
+        "name": "철벽방어", "type": "defense", "cooldown": 10,
+        "shield": 50, "thorns": 6, "thornsDuration": 6,
+        "description": "쉴드 50 + 6틱간 가시 반사 6"
+      }
     },
     "마법로브": {
       "slot": "armor", "cost": 250,
       "stats": { "DEF": 2, "INT": 5 },
-      "skill": { "name": "마력증폭", "type": "buff", "damage": 0, "duration": 6, "cooldown": 10, "description": "스킬 데미지 50% 증가" }
+      "skill": {
+        "name": "마력증폭", "type": "buff", "cooldown": 8,
+        "duration": 8, "skillDamageMul": 2.0, "nextSkillOnly": true,
+        "description": "다음 스킬 데미지 2배"
+      }
     }
   },
   "weapons": {
     "단검": {
       "slot": "weapon", "cost": 100,
-      "stats": { "ATK": 5, "SPD": 2 },
-      "skill": { "name": "연속찌르기", "type": "attack", "damage": 15, "hits": 3, "cooldown": 5, "description": "빠른 3연타" }
+      "stats": { "ATK": 4, "SPD": 2 },
+      "skill": {
+        "name": "연속찌르기", "type": "attack", "cooldown": 6,
+        "damage": 10, "hits": 3,
+        "dot": { "name": "출혈", "tickDamage": 3, "duration": 4 },
+        "description": "3연타 + 출혈"
+      }
     },
     "대검": {
       "slot": "weapon", "cost": 200,
-      "stats": { "ATK": 12 },
-      "skill": { "name": "강타", "type": "attack", "damage": 40, "hits": 1, "cooldown": 8, "description": "강력한 일격" }
+      "stats": { "ATK": 10 },
+      "skill": {
+        "name": "강타", "type": "attack", "cooldown": 7,
+        "damage": 35, "hits": 1,
+        "knockback": 60,
+        "description": "강력한 일격 + 넉백"
+      }
     },
     "지팡이": {
       "slot": "weapon", "cost": 250,
-      "stats": { "ATK": 3, "INT": 8 },
-      "skill": { "name": "마력폭발", "type": "attack", "damage": 35, "aoe": true, "cooldown": 10, "description": "범위 마법 공격" }
+      "stats": { "ATK": 3, "INT": 7 },
+      "skill": {
+        "name": "마력폭발", "type": "attack", "cooldown": 9,
+        "damage": 30, "aoe": true,
+        "dot": { "name": "화상", "tickDamage": 4, "duration": 4 },
+        "description": "범위 마법 + 화상"
+      }
     }
   },
   "boots": {
     "경량부츠": {
       "slot": "boots", "cost": 100,
-      "stats": { "SPD": 3 },
-      "skill": { "name": "대시", "type": "movement", "damage": 0, "cooldown": 4, "description": "빠르게 이동" }
+      "stats": { "SPD": 3, "ATK": 1 },
+      "skill": {
+        "name": "대시", "type": "movement", "cooldown": 5,
+        "dashDistance": 80, "direction": "toward",
+        "dashDamage": 12,
+        "description": "돌진 + 경로상 데미지 12"
+      }
     },
     "중갑부츠": {
       "slot": "boots", "cost": 150,
-      "stats": { "DEF": 4, "SPD": 1 },
-      "skill": { "name": "지진밟기", "type": "attack", "damage": 20, "aoe": true, "cooldown": 8, "description": "주변 적에게 피해" }
+      "stats": { "DEF": 3, "SPD": 1, "ATK": 1 },
+      "skill": {
+        "name": "지진밟기", "type": "attack", "cooldown": 7,
+        "damage": 25, "aoe": true,
+        "stun": 2,
+        "description": "주변 피해 + 2틱 기절"
+      }
     },
     "질풍부츠": {
       "slot": "boots", "cost": 200,
-      "stats": { "SPD": 5, "ATK": 2 },
-      "skill": { "name": "질풍돌진", "type": "attack", "damage": 25, "cooldown": 6, "description": "돌진하며 공격" }
+      "stats": { "SPD": 4, "ATK": 2 },
+      "skill": {
+        "name": "질풍돌진", "type": "attack", "cooldown": 6,
+        "damage": 22,
+        "dot": { "name": "열상", "tickDamage": 3, "duration": 3 },
+        "knockback": 30,
+        "description": "돌진 + 열상 + 넉백"
+      }
     }
   }
 }
