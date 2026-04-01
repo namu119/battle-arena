@@ -435,6 +435,18 @@ io.on('connection', (socket) => {
     }
   });
 
+  // 시그널 색상 변경
+  socket.on('setSignalColor', (color) => {
+    const validColors = ['none', 'red', 'blue', 'green', 'yellow', 'purple'];
+    if (!validColors.includes(color)) return;
+    if (!currentArena) return;
+    const char = currentArena.engine.characters.find(c => c.id === 'p0');
+    if (char) {
+      char.signalColor = color;
+      console.log(`시그널 색상: ${char.name} → ${color}`);
+    }
+  });
+
   function resumeSurvival() {
     if (rewardTimeout) { clearTimeout(rewardTimeout); rewardTimeout = null; }
     runSurvivalSegment();
