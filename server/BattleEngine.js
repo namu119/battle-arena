@@ -50,6 +50,7 @@ class BattleEngine {
         alive: true,
         gold: 0,
         stunTicks: 0, // 스턴 남은 틱
+        signalColor: build.signalColor || 'none',
       };
     });
   }
@@ -66,6 +67,7 @@ class BattleEngine {
       enhancementLevels: charData.enhancementLevels || { helmet: 0, armor: 0, weapon: 0, boots: 0 },
       gold: charData.gold || 0,
       stunTicks: charData.stunTicks || 0,
+      signalColor: charData.signalColor || 'none',
       skills: (charData.skills || []).map(s => ({ ...s, currentCooldown: s.currentCooldown || 0 })),
     });
   }
