@@ -116,6 +116,16 @@
       <button class="pvp-stance-btn active" id="stanceRetaliate" onclick="setPvpStance('retaliate')">🔄 반격</button>
       <button class="pvp-stance-btn" id="stanceHostile" onclick="setPvpStance('hostile')">⚔️ 적대</button>
     </div>
+    <!-- 시그널 색상 -->
+    <div class="signal-color-bar">
+      <span class="signal-label">시그널:</span>
+      <button class="signal-btn active" data-color="none" onclick="setSignalColor('none')" style="background:#555">✕</button>
+      <button class="signal-btn" data-color="red" onclick="setSignalColor('red')" style="background:#e94560"></button>
+      <button class="signal-btn" data-color="blue" onclick="setSignalColor('blue')" style="background:#3498db"></button>
+      <button class="signal-btn" data-color="green" onclick="setSignalColor('green')" style="background:#2ecc71"></button>
+      <button class="signal-btn" data-color="yellow" onclick="setSignalColor('yellow')" style="background:#f0a500"></button>
+      <button class="signal-btn" data-color="purple" onclick="setSignalColor('purple')" style="background:#a855f7"></button>
+    </div>
   </div>
 
   <!-- 결과 화면 -->

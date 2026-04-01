@@ -1611,3 +1611,37 @@ input::placeholder {
   .reward-timer { font-size: 1.3em; }
   .reward-title { font-size: 0.9em; }
 }
+
+
+/* ── Signal Color Bar ── */
+.signal-color-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 0;
+}
+.signal-label {
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+  margin-right: 4px;
+}
+.signal-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform var(--t-fast), border-color var(--t-fast);
+  font-size: 12px;
+  color: #fff;
+  line-height: 24px;
+  text-align: center;
+}
+.signal-btn:hover {
+  transform: scale(1.15);
+}
+.signal-btn.active {
+  border-color: #fff;
+  box-shadow: 0 0 8px rgba(255,255,255,0.4);
+}

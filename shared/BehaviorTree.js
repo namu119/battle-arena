@@ -301,6 +301,12 @@ class BehaviorTree {
     }
 
     // 적대 모드: 기존 로직
+    // 같은 시그널 색상이면 PvP 우선도 대폭 감소
+    const mySignal = this.char.signalColor || 'none';
+    if (mySignal !== 'none') {
+      const sameColor = players.filter(e => e.signalColor === mySignal);
+      if (sameColor.length > 0 && sameColor.length === players.length) return w.attack * 0.05;
+    }
     const myEnhance = this._getEnhanceTotal();
     const pvpReady = myEnhance >= 3 && hpRatio > 0.6;
     const pvpAggressive = myEnhance >= 6 && hpRatio > 0.4;
@@ -334,6 +340,12 @@ class BehaviorTree {
     }
 
     // 적대 모드: 기존 로직
+    // 같은 시그널 색상 제외
+    const mySignal2 = this.char.signalColor || 'none';
+    if (mySignal2 !== 'none') {
+      players = players.filter(e => e.signalColor !== mySignal2);
+      if (players.length === 0) return null;
+    }
     const pvpReady = myEnhance >= 3 && myHpRatio > 0.6;
     const pvpAggressive = myEnhance >= 6 && myHpRatio > 0.4;
 

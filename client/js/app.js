@@ -10,7 +10,8 @@ window.Game = {
   classColors: { '전사':'#e94560', '마법사':'#7b2ff7', '도적':'#2ecc71', '기사':'#3498db', '궁수':'#f39c12' },
   playbackSpeed: 1,
   SPEED_OPTIONS: [1, 2, 4],
-  pvpStance: 'retaliate', // passive / hostile / retaliate
+  pvpStance: 'retaliate',
+  signalColor: 'none', // passive / hostile / retaliate
   // battle state
   battleChars: [],
   animations: [],
@@ -220,4 +221,15 @@ function setPvpStance(stance) {
   }
   var active = document.getElementById(map[stance]);
   if (active) active.classList.add('active');
+}
+
+// Signal color
+function setSignalColor(color) {
+  G.signalColor = color;
+  G.socket.emit('setSignalColor', color);
+  var btns = document.querySelectorAll('.signal-btn');
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].classList.remove('active');
+    if (btns[i].dataset.color === color) btns[i].classList.add('active');
+  }
 }

@@ -239,7 +239,9 @@ function renderSurvivalFrame() {
     var mny = (mc.y / 400) * 2 - 1;
     var mdx = mmCx + (mnx - mny) * mmDw * 0.5;
     var mdy = mmCy + (mnx + mny) * mmDh * 0.5;
-    sCtx.fillStyle = mc.isMonster ? (mc.isBoss ? '#ff0000' : '#ff8800') : (G.classColors[mc.className] || '#fff');
+    var mcSigColors = {red:'#e94560',blue:'#3498db',green:'#2ecc71',yellow:'#f0a500',purple:'#a855f7'};
+    var mcColor = mc.isMonster ? (mc.isBoss ? '#ff0000' : '#ff8800') : (mc.signalColor && mc.signalColor !== 'none' && mcSigColors[mc.signalColor]) || (G.classColors[mc.className] || '#fff');
+    sCtx.fillStyle = mcColor;
     var dotR = mc.isMonster ? (mc.isBoss ? 2.5 : 1.2) : 2;
     sCtx.beginPath();
     sCtx.arc(mdx, mdy, dotR, 0, Math.PI * 2);

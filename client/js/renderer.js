@@ -177,6 +177,27 @@ function drawCharacter(ctx, char, qvX, qvY, scale, deathProgress) {
 
   ctx.restore();
 
+  // Signal color marker
+  if (char.alive && char.signalColor && char.signalColor !== 'none' && !char.isDecoy) {
+    var sigColors = {red:'#e94560',blue:'#3498db',green:'#2ecc71',yellow:'#f0a500',purple:'#a855f7'};
+    var sigC = sigColors[char.signalColor];
+    if (sigC) {
+      ctx.save();
+      ctx.translate(qvX, qvY);
+      var markerY = -baseSize * 2.2;
+      ctx.fillStyle = sigC;
+      ctx.globalAlpha = 0.85;
+      ctx.beginPath();
+      ctx.arc(0, markerY, baseSize * 0.25, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+  }
+
   // HP bar above character (잔상은 HP바 숨김)
   if (char.alive && !char.isDecoy && (deathProgress === undefined)) {
     var hpRatio = Math.max(0, (char.hp || 0) / (char.maxHP || char.stats?.maxHP || 1));

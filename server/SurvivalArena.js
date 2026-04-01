@@ -384,6 +384,7 @@ class SurvivalArena {
         zoneId: c.zoneId,
         isMonster: !!c.isMonster,
         isDecoy: !!c.isDecoy,
+        signalColor: c.signalColor || "none",
         level: c.level || 0,
         gold: c.gold || 0,
         enhancementLevels: c.enhancementLevels || null,
