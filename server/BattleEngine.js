@@ -98,6 +98,19 @@ class BattleEngine {
     // 2. DOT 처리
     this.processDots();
 
+    // 2.5 잔상 수명 처리
+    for (const char of this.characters) {
+      if (!char.isDecoy || !char.alive) continue;
+      if (char.decoyTTL != null) {
+        char.decoyTTL--;
+        if (char.decoyTTL <= 0) {
+          char.alive = false;
+          char.deathTick = this.tick;
+          this.tickEvents.push({ type: 'death', target: char.id });
+        }
+      }
+    }
+
     // 3. 캐릭터 행동 (속도 순)
     const aliveChars = this.characters.filter(c => c.alive);
     const ordered = [...aliveChars].sort((a, b) => b.stats.SPD - a.stats.SPD);
@@ -440,7 +453,7 @@ class BattleEngine {
       caster.x = Math.max(0, Math.min(ARENA_WIDTH, caster.x));
       this.tickEvents.push({ type: 'teleport', id: caster.id, fromX: Math.round(oldX), toX: Math.round(caster.x) });
 
-      // 잔상(미끼) 생성
+      // 잔상(미끼) 생성 — 어그로 + 자동소멸
       if (skillData.decoy) {
         this.addCharacter({
           id: `decoy_${caster.id}_${this.tick}`,
@@ -448,14 +461,16 @@ class BattleEngine {
           team: caster.team,
           className: caster.className,
           passive: null,
-          stats: { maxHP: skillData.decoy.hp, ATK: 0, DEF: 0, INT: 0, SPD: 0 },
+          stats: { maxHP: skillData.decoy.hp, ATK: 1, DEF: 0, INT: 0, SPD: 0 },
           hp: skillData.decoy.hp,
-          range: 0,
-          btWeights: { survive: 0, skill: 0, attack: 0 },
+          range: 80,
+          btWeights: { survive: 0, skill: 0, attack: 1 },
           skills: [],
           x: oldX,
           y: caster.y,
           isDecoy: true,
+          decoyTTL: skillData.decoy.duration || 8,
+          buffs: [{ type: 'taunt', duration: skillData.decoy.duration || 8 }],
         });
         this.tickEvents.push({ type: 'decoyCreate', x: Math.round(oldX) });
       }

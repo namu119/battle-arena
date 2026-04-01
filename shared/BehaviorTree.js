@@ -479,6 +479,14 @@ class BehaviorTree {
 
   getNearestEnemy(enemies) {
     if (enemies.length === 0) return null;
+    // 도발(taunt) 대상 우선
+    const taunters = enemies.filter(e => e.buffs && e.buffs.some(b => b.type === 'taunt'));
+    if (taunters.length > 0) {
+      return taunters.reduce(
+        (min, e) => (this.getDistance(e) < this.getDistance(min) ? e : min),
+        taunters[0]
+      );
+    }
     return enemies.reduce(
       (min, e) => (this.getDistance(e) < this.getDistance(min) ? e : min),
       enemies[0]
