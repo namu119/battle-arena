@@ -17,6 +17,8 @@ var WALL_SERVER_X = [480, 1120];
 var WALL_COLS = WALL_SERVER_X.map(function(wx) { return Math.round(wx / MAP_WIDTH * GRID_COLS); });
 var _ZONE_COLORS = { fire:'rgba(255,68,0,0.12)', ice:'rgba(68,187,255,0.12)', wind:'rgba(68,255,136,0.1)' };
 var _ZONE_BORDERS = { fire:'#ff4400', ice:'#44bbff', wind:'#44ff88' };
+var TERRAIN_CELL_COLORS = { forest:'#0a3a1a', lava:'#3a1005', sanctuary:'#0a2a3a', swamp:'#1a2a10' };
+var TERRAIN_CELL_ICONS = { forest:'🌲', lava:'🔥', sanctuary:'✨', swamp:'🌿' };
 var _GRID_ZONE_COLORS = ['#0f2847', '#0d2040', '#0f2847'];
 
 function resizeSurvivalCanvas() {
@@ -139,11 +141,23 @@ function drawSurvivalField(W, H) {
         sCtx.fillText('\uD83E\uDDF1', mx, my + 3);
       } else {
         var zone = c < WALL_COLS[0] ? 0 : c < WALL_COLS[1] ? 1 : 2;
-        sCtx.fillStyle = _GRID_ZONE_COLORS[zone];
+        // 지형 효과 체크
+        var terrain = (G.terrainMap || []).find(function(t) { return t.col === c && t.row === r; });
+        sCtx.fillStyle = terrain ? (TERRAIN_CELL_COLORS[terrain.type] || _GRID_ZONE_COLORS[zone]) : _GRID_ZONE_COLORS[zone];
         sCtx.fill();
-        sCtx.strokeStyle = '#1a3a5c';
-        sCtx.lineWidth = 0.5;
+        sCtx.strokeStyle = terrain ? 'rgba(255,255,255,0.15)' : '#1a3a5c';
+        sCtx.lineWidth = terrain ? 1 : 0.5;
         sCtx.stroke();
+        // 지형 아이콘
+        if (terrain && TERRAIN_CELL_ICONS[terrain.type]) {
+          var tcx = (shifted[0].sx + shifted[2].sx) / 2;
+          var tcy = (shifted[0].sy + shifted[2].sy) / 2;
+          sCtx.font = Math.round(W * 0.015) + 'px sans-serif';
+          sCtx.textAlign = 'center';
+          sCtx.globalAlpha = 0.5;
+          sCtx.fillText(TERRAIN_CELL_ICONS[terrain.type], tcx, tcy + 2);
+          sCtx.globalAlpha = 1;
+        }
       }
     }
   }
@@ -437,6 +451,7 @@ G.socket.on('survivalStart', function(data) {
   G.survivalPhase = 1;
   G.survivalActiveZones = [0,1,2,3];
   G.survivalZones = [];
+  G.terrainMap = data.terrainMap || [];
   G.isSurvivalActive = true;
   G.cameraZoom = 1.0;
   G.cameraZoomTarget = 1.0;
@@ -636,6 +651,10 @@ G.socket.on('survivalTick', function(data) {
         var dodgePos = _getCachedPos(dodgeTarget);
         if (dodgePos) G.survivalAnimations.push({ type:'skillName', x:dodgePos.qvX, y:dodgePos.qvY-20, startY:dodgePos.qvY-20, text:'DODGE!', born:performance.now(), duration:700 });
       }
+    }
+    if (evt.type === 'bossPhase') {
+      survivalNotify('🐉 ' + evt.name, '#ff4400');
+      survivalLogAdd('🐉 보스 페이즈 전환: ' + evt.name, null, true);
     }
     if (evt.type === 'waveSpawn') {
       survivalNotify('\u2694 Wave 몬스터 출현!', '#ff6644');

@@ -7,7 +7,11 @@
     "def": 1,
     "spd": 3,
     "range": 50,
-    "btWeights": { "survive": 10, "skill": 10, "attack": 80 },
+    "btWeights": {
+      "survive": 10,
+      "skill": 10,
+      "attack": 80
+    },
     "skills": []
   },
   "lv1_goblin": {
@@ -18,7 +22,11 @@
     "def": 1,
     "spd": 4,
     "range": 50,
-    "btWeights": { "survive": 5, "skill": 5, "attack": 90 },
+    "btWeights": {
+      "survive": 5,
+      "skill": 5,
+      "attack": 90
+    },
     "skills": []
   },
   "lv2_wolf": {
@@ -29,7 +37,11 @@
     "def": 4,
     "spd": 6,
     "range": 50,
-    "btWeights": { "survive": 10, "skill": 10, "attack": 80 },
+    "btWeights": {
+      "survive": 10,
+      "skill": 10,
+      "attack": 80
+    },
     "skills": []
   },
   "lv2_skeleton": {
@@ -40,9 +52,19 @@
     "def": 6,
     "spd": 4,
     "range": 60,
-    "btWeights": { "survive": 20, "skill": 20, "attack": 60 },
+    "btWeights": {
+      "survive": 20,
+      "skill": 20,
+      "attack": 60
+    },
     "skills": [
-      { "name": "뼈던지기", "type": "attack", "damage": 15, "cooldown": 5, "description": "원거리 뼈 투척" }
+      {
+        "name": "뼈던지기",
+        "type": "attack",
+        "damage": 15,
+        "cooldown": 5,
+        "description": "원거리 뼈 투척"
+      }
     ]
   },
   "lv3_orc": {
@@ -53,9 +75,20 @@
     "def": 6,
     "spd": 4,
     "range": 60,
-    "btWeights": { "survive": 15, "skill": 25, "attack": 60 },
+    "btWeights": {
+      "survive": 15,
+      "skill": 25,
+      "attack": 60
+    },
     "skills": [
-      { "name": "전쟁함성", "type": "buff", "damage": 0, "duration": 5, "cooldown": 10, "description": "자신을 강화" }
+      {
+        "name": "전쟁함성",
+        "type": "buff",
+        "damage": 0,
+        "duration": 5,
+        "cooldown": 10,
+        "description": "자신을 강화"
+      }
     ]
   },
   "lv3_mage_ghost": {
@@ -66,9 +99,19 @@
     "def": 2,
     "spd": 4,
     "range": 150,
-    "btWeights": { "survive": 20, "skill": 60, "attack": 20 },
+    "btWeights": {
+      "survive": 20,
+      "skill": 60,
+      "attack": 20
+    },
     "skills": [
-      { "name": "어둠화살", "type": "attack", "damage": 20, "cooldown": 6, "description": "마법 투사체" }
+      {
+        "name": "어둠화살",
+        "type": "attack",
+        "damage": 20,
+        "cooldown": 6,
+        "description": "마법 투사체"
+      }
     ]
   },
   "lv4_troll": {
@@ -79,9 +122,19 @@
     "def": 8,
     "spd": 3,
     "range": 60,
-    "btWeights": { "survive": 25, "skill": 15, "attack": 60 },
+    "btWeights": {
+      "survive": 25,
+      "skill": 15,
+      "attack": 60
+    },
     "skills": [
-      { "name": "분쇄타격", "type": "attack", "damage": 35, "cooldown": 8, "description": "강력한 일격" }
+      {
+        "name": "분쇄타격",
+        "type": "attack",
+        "damage": 35,
+        "cooldown": 8,
+        "description": "강력한 일격"
+      }
     ]
   },
   "lv4_dragon_whelp": {
@@ -92,9 +145,20 @@
     "def": 6,
     "spd": 5,
     "range": 100,
-    "btWeights": { "survive": 15, "skill": 50, "attack": 35 },
+    "btWeights": {
+      "survive": 15,
+      "skill": 50,
+      "attack": 35
+    },
     "skills": [
-      { "name": "화염숨결", "type": "attack", "damage": 25, "aoe": true, "cooldown": 10, "description": "범위 화염" }
+      {
+        "name": "화염숨결",
+        "type": "attack",
+        "damage": 25,
+        "aoe": true,
+        "cooldown": 10,
+        "description": "범위 화염"
+      }
     ]
   },
   "lv5_gate_golem": {
@@ -105,9 +169,20 @@
     "def": 15,
     "spd": 2,
     "range": 70,
-    "btWeights": { "survive": 40, "skill": 20, "attack": 40 },
+    "btWeights": {
+      "survive": 40,
+      "skill": 20,
+      "attack": 40
+    },
     "skills": [
-      { "name": "대지진동", "type": "attack", "damage": 30, "aoe": true, "cooldown": 12, "description": "주변 강타" }
+      {
+        "name": "대지진동",
+        "type": "attack",
+        "damage": 30,
+        "aoe": true,
+        "cooldown": 12,
+        "description": "주변 강타"
+      }
     ]
   },
   "boss_ancient_dragon": {
@@ -118,10 +193,145 @@
     "def": 20,
     "spd": 3,
     "range": 150,
-    "btWeights": { "survive": 10, "skill": 50, "attack": 40 },
+    "btWeights": {
+      "survive": 10,
+      "skill": 50,
+      "attack": 40
+    },
+    "isBoss": true,
+    "bossPhases": [
+      {
+        "hpThreshold": 1.0,
+        "name": "Phase 1 - 화염",
+        "skills": [
+          {
+            "name": "화염숨결",
+            "type": "attack",
+            "damage": 30,
+            "aoe": true,
+            "cooldown": 8,
+            "description": "범위 화염"
+          },
+          {
+            "name": "용의일격",
+            "type": "attack",
+            "damage": 40,
+            "hits": 1,
+            "cooldown": 5,
+            "description": "강력한 일격"
+          }
+        ],
+        "statMul": {
+          "ATK": 1.0,
+          "DEF": 1.0,
+          "SPD": 1.0
+        }
+      },
+      {
+        "hpThreshold": 0.6,
+        "name": "Phase 2 - 분노",
+        "skills": [
+          {
+            "name": "멸절의숨결",
+            "type": "attack",
+            "damage": 50,
+            "aoe": true,
+            "cooldown": 6,
+            "dot": {
+              "name": "화상",
+              "tickDamage": 5,
+              "duration": 4
+            },
+            "description": "전체 화염 + 화상"
+          },
+          {
+            "name": "꼬리강타",
+            "type": "attack",
+            "damage": 45,
+            "hits": 1,
+            "knockback": 80,
+            "stun": 2,
+            "cooldown": 7,
+            "description": "넉백 + 기절"
+          },
+          {
+            "name": "용의포효",
+            "type": "buff",
+            "duration": 8,
+            "cooldown": 15,
+            "description": "공격력 증가"
+          }
+        ],
+        "statMul": {
+          "ATK": 1.3,
+          "DEF": 0.9,
+          "SPD": 1.2
+        }
+      },
+      {
+        "hpThreshold": 0.25,
+        "name": "Phase 3 - 폭주",
+        "skills": [
+          {
+            "name": "멸절의숨결",
+            "type": "attack",
+            "damage": 60,
+            "aoe": true,
+            "cooldown": 4,
+            "dot": {
+              "name": "업화",
+              "tickDamage": 8,
+              "duration": 5
+            },
+            "description": "강화 범위 화염"
+          },
+          {
+            "name": "용염장판",
+            "type": "zone",
+            "cooldown": 10,
+            "zone": {
+              "radius": 120,
+              "duration": 10,
+              "tickDamage": 12,
+              "slow": 0.4,
+              "visual": "fire"
+            },
+            "description": "거대 화염 장판"
+          },
+          {
+            "name": "최후의발악",
+            "type": "attack",
+            "damage": 70,
+            "hits": 2,
+            "knockback": 100,
+            "cooldown": 8,
+            "description": "2연타 + 대넉백"
+          }
+        ],
+        "statMul": {
+          "ATK": 1.6,
+          "DEF": 0.7,
+          "SPD": 1.5
+        }
+      }
+    ],
     "skills": [
-      { "name": "멸절의숨결", "type": "attack", "damage": 50, "aoe": true, "cooldown": 8, "description": "전체 화염" },
-      { "name": "용의포효", "type": "attack", "damage": 35, "cooldown": 5, "description": "강력한 일격" }
+      {
+        "name": "화염숨결",
+        "type": "attack",
+        "damage": 30,
+        "aoe": true,
+        "cooldown": 8,
+        "description": "범위 화염"
+      },
+      {
+        "name": "용의일격",
+        "type": "attack",
+        "damage": 40,
+        "hits": 1,
+        "cooldown": 5,
+        "description": "강력한 일격"
+      }
     ]
   },
   "lv5_gate_dragon": {
@@ -132,9 +342,20 @@
     "def": 10,
     "spd": 4,
     "range": 120,
-    "btWeights": { "survive": 20, "skill": 50, "attack": 30 },
+    "btWeights": {
+      "survive": 20,
+      "skill": 50,
+      "attack": 30
+    },
     "skills": [
-      { "name": "용염폭풍", "type": "attack", "damage": 40, "aoe": true, "cooldown": 10, "description": "광역 화염" }
+      {
+        "name": "용염폭풍",
+        "type": "attack",
+        "damage": 40,
+        "aoe": true,
+        "cooldown": 10,
+        "description": "광역 화염"
+      }
     ]
   }
 }

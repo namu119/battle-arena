@@ -42,6 +42,8 @@ class SurvivalArena {
     this.log = [];
     this.metaEvents = []; // zone merges, wave spawns, drops
     this.bossSpawned = false;
+    this.terrainMap = this._generateTerrain();
+    this.engine.terrainMap = this.terrainMap;
     this.bossKiller = null;
     this._playerKills = new Map();
     this._playerDamage = new Map();
@@ -114,6 +116,23 @@ class SurvivalArena {
       return true;
     }
     return false;
+  }
+
+  /** 지형 맵 생성 (벽 칸 제외, 랜덤 배치) */
+  _generateTerrain() {
+    const types = ['forest', 'lava', 'sanctuary', 'swamp'];
+    const terrain = [];
+    const wallCols = [3, 7]; // WALL_COLS
+    for (let c = 0; c < 10; c++) {
+      if (wallCols.includes(c)) continue;
+      for (let r = 0; r < 6; r++) {
+        // 30% 확률로 지형 배치
+        if (Math.random() < 0.3) {
+          terrain.push({ col: c, row: r, type: types[Math.floor(Math.random() * types.length)] });
+        }
+      }
+    }
+    return terrain;
   }
 
   /** 보상 3개 생성 (스탯 + 스킬모듈 혼합) */
@@ -380,6 +399,7 @@ class SurvivalArena {
     // 6. Check zone merges + boss spawn
     this._checkZoneMerges();
     this._checkBossSpawn();
+    this._updateBossPhase();
 
     // 6. Check end conditions
     // A) Boss killed → last-hitter wins
@@ -626,6 +646,35 @@ class SurvivalArena {
     }
   }
 
+  /** 보스 페이즈 전환 (HP 비율 기준) */
+  _updateBossPhase() {
+    const boss = this.engine.characters.find(c => c.isBoss && c.alive);
+    if (!boss || !boss._bossPhases) return;
+
+    const hpRatio = boss.hp / boss.stats.maxHP;
+    let newPhaseIdx = 0;
+    for (let i = boss._bossPhases.length - 1; i >= 0; i--) {
+      if (hpRatio <= boss._bossPhases[i].hpThreshold) {
+        newPhaseIdx = i;
+        break;
+      }
+    }
+
+    if (newPhaseIdx !== (boss._currentPhase || 0)) {
+      const phase = boss._bossPhases[newPhaseIdx];
+      boss._currentPhase = newPhaseIdx;
+      // 스킬 교체
+      boss.skills = phase.skills.map(s => ({ ...s, currentCooldown: 0 }));
+      // 스탯 배율 적용
+      if (phase.statMul) {
+        boss.stats.ATK = Math.round(boss.baseStats.ATK * phase.statMul.ATK);
+        boss.stats.DEF = Math.round(boss.baseStats.DEF * phase.statMul.DEF);
+        boss.stats.SPD = Math.round(boss.baseStats.SPD * phase.statMul.SPD);
+      }
+      this.metaEvents.push({ type: 'bossPhase', phase: newPhaseIdx + 1, name: phase.name });
+    }
+  }
+
   _checkBossSpawn() {
     if (this.bossSpawned) return;
     // Spawn boss when: all walls broken OR tick >= 600
@@ -652,6 +701,8 @@ class SurvivalArena {
         alive: true,
         isMonster: true,
         isBoss: true,
+        _bossPhases: bossTemplate.bossPhases || null,
+        _currentPhase: 0,
         level: bossTemplate.level,
       };
       this.engine.addCharacter(boss);

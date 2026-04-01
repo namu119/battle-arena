@@ -4,7 +4,15 @@ const TICK_INTERVAL = 200; // ms
 const ARENA_WIDTH = 1600;
 const ARENA_HEIGHT = 400;
 const MAX_TICKS = 300; // 60초 제한
-const DAMAGE_SCALE = 0.35; // 글로벌 데미지 감쇄
+const DAMAGE_SCALE = 0.35;
+
+// 지형 효과 타입
+const TERRAIN_EFFECTS = {
+  forest: { dodge: 0.15 },      // 숲: 회피 +15%
+  lava: { tickDamage: 5 },       // 용암: 틱당 5뎀
+  sanctuary: { healPerTick: 3 }, // 성소: 틱당 3회복
+  swamp: { slow: 0.3 },          // 늪: 이동속도 -30%
+}; // 글로벌 데미지 감쇄
 
 class BattleEngine {
   constructor(players, options = {}) {
@@ -16,7 +24,8 @@ class BattleEngine {
     this.maxTicks = options.maxTicks || MAX_TICKS;
     this.finishCondition = options.finishCondition || 'lastStanding';
     this.pendingCharacters = [];
-    this.wallBarriers = []; // [{x, active}] - set by orchestrator
+    this.wallBarriers = [];
+    this.terrainMap = options.terrainMap || []; // [{col, row, type}] // [{x, active}] - set by orchestrator
     this.zones = []; // 지속 영역 효과 [{x, y, radius, tickDamage, slow, duration, ownerId, ownerTeam, visual}]
 
     this.initCharacters(players);
@@ -94,6 +103,36 @@ class BattleEngine {
 
     // 1. 존 효과 처리 (지속 영역 데미지/슬로우)
     this.processZones();
+
+    // 1.5 지형 효과 처리
+    if (this.terrainMap.length > 0) {
+      const colWidth = ARENA_WIDTH / 10;
+      const rowHeight = ARENA_HEIGHT / 6;
+      for (const char of this.characters.filter(c => c.alive)) {
+        const col = Math.floor(char.x / colWidth);
+        const row = Math.floor(char.y / rowHeight);
+        const terrain = this.terrainMap.find(t => t.col === col && t.row === row);
+        if (!terrain) continue;
+        const eff = TERRAIN_EFFECTS[terrain.type];
+        if (!eff) continue;
+        // 용암: 틱 데미지 (몬스터 제외)
+        if (eff.tickDamage && !char.isMonster) {
+          this.applyDamage(char, Math.round(eff.tickDamage * DAMAGE_SCALE), 'terrain', '용암', this.tickEvents);
+        }
+        // 성소: 회복
+        if (eff.healPerTick && char.hp < char.stats.maxHP) {
+          char.hp = Math.min(char.stats.maxHP, char.hp + eff.healPerTick);
+        }
+        // 숲: 회피 버프 (2틱, 중복 방지)
+        if (eff.dodge && !char.buffs.some(b => b.type === 'dodge' && b.name === 'terrain')) {
+          char.buffs.push({ type: 'dodge', value: eff.dodge, duration: 2, name: 'terrain' });
+        }
+        // 늪: 슬로우 (2틱, 중복 방지)
+        if (eff.slow && !char.buffs.some(b => b.type === 'slow' && b.name === 'terrain')) {
+          char.buffs.push({ type: 'slow', value: eff.slow, duration: 2, name: 'terrain' });
+        }
+      }
+    }
 
     // 2. DOT 처리
     this.processDots();
@@ -679,4 +718,4 @@ class BattleEngine {
   }
 }
 
-module.exports = { BattleEngine, TICK_INTERVAL };
+module.exports = { BattleEngine, TICK_INTERVAL, TERRAIN_EFFECTS };
