@@ -346,6 +346,31 @@ class SurvivalArena {
       }
     }
 
+    // 4.5 AI 시그널 색상 동조 (10틱마다)
+    if (this.tick % 10 === 0) {
+      const players = this.engine.characters.filter(c => c.alive && !c.isMonster && !c.isDecoy);
+      const ais = this.engine.characters.filter(c => c.alive && !c.isMonster && !c.isDecoy && c.id !== 'p0');
+      const human = players.find(c => c.id === 'p0');
+      for (const ai of ais) {
+        // 같은 존에 있는 플레이어의 색상 확인
+        const nearbyPlayers = players.filter(p => p.signalColor && p.signalColor !== 'none' && Math.abs(p.x - ai.x) < 300);
+        if (nearbyPlayers.length > 0) {
+          // 가장 가까운 플레이어 색상 60% 확률로 동조
+          const nearest = nearbyPlayers.reduce((min, p) => Math.abs(p.x - ai.x) < Math.abs(min.x - ai.x) ? p : min, nearbyPlayers[0]);
+          if (Math.random() < 0.6) {
+            ai.signalColor = nearest.signalColor;
+          } else if (Math.random() < 0.15) {
+            // 15% 확률로 다른 색 선택 (배신/독자 행동)
+            const colors = ['none', 'red', 'blue', 'green', 'yellow', 'purple'];
+            ai.signalColor = colors[Math.floor(Math.random() * colors.length)];
+          }
+        } else if (ai.signalColor && ai.signalColor !== 'none' && Math.random() < 0.1) {
+          // 근처에 같은 색 플레이어 없으면 10% 확률로 색 해제
+          ai.signalColor = 'none';
+        }
+      }
+    }
+
     // 5. Enforce walls + check gatekeeper deaths
     this._enforceWalls();
 
