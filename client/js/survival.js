@@ -195,9 +195,10 @@ function renderSurvivalFrame() {
 
   sCtx.clearRect(0, 0, W, H);
 
-  // 줌 적용: 캔버스 중심 기준 스케일
+  // Screen shake + 줌 적용
+  var sShake = getShakeOffset(now);
   sCtx.save();
-  sCtx.translate(W/2, H/2);
+  sCtx.translate(W/2 + sShake.dx, H/2 + sShake.dy);
   sCtx.scale(zoom, zoom);
   sCtx.translate(-W/2, -H/2);
 
@@ -431,8 +432,8 @@ function addKillFeed(killerName, killerClass, victimName, victimClass, skill) {
   if (!feed) return;
   var item = document.createElement('div');
   item.className = 'kill-feed-item';
-  var skillText = skill ? ' [' + skill + ']' : '';
-  item.innerHTML = '<span class="killer">' + killerName + '</span><span class="skull">💀</span><span class="victim">' + victimName + '</span>' + skillText;
+  var skillText = skill ? ' [' + esc(skill) + ']' : '';
+  item.innerHTML = '<span class="killer">' + esc(killerName) + '</span><span class="skull">💀</span><span class="victim">' + esc(victimName) + '</span>' + skillText;
   feed.appendChild(item);
   // 최대 5개 유지
   while (feed.children.length > 5) feed.removeChild(feed.firstChild);
@@ -538,6 +539,9 @@ G.socket.on('survivalTick', function(data) {
         var pos = serverToSurvivalQV(target.x, targetIdx, _aliveCache.length, survivalCanvas.width, survivalCanvas.height);
         G.survivalAnimations.push({ type:'damage', x:pos.qvX, y:pos.qvY-15, startY:pos.qvY-15, amount:evt.amount, isSkill:!!evt.skill, isCrit:!!evt.crit, born:performance.now(), duration:evt.crit?1200:1000 });
       }
+      // Sound + hit flash
+      if (!target || !target.isMonster) processEventSounds(evt, G.survivalChars);
+      else if (target) target.hitFlashUntil = performance.now() + 100;
       if (evt.amount >= 5 || evt.skill || evt.crit) {
         var aName = attacker ? attacker.name : '?';
         var tName = target ? target.name : '?';
@@ -552,6 +556,7 @@ G.socket.on('survivalTick', function(data) {
       if (dc && cIdx !== undefined) {
         var dpos = serverToSurvivalQV(dc.x, cIdx, _aliveCache.length, survivalCanvas.width, survivalCanvas.height);
         G.survivalDeathAnims.set(evt.target, { born:performance.now(), duration:800 });
+        processEventSounds(evt, G.survivalChars);
         var killer = evt.killedBy ? G.survivalChars.find(function(ch) { return ch.id === evt.killedBy; }) : null;
         // Kill feed
         if (killer && dc) {
@@ -580,6 +585,7 @@ G.socket.on('survivalTick', function(data) {
       if (caster && !caster.isMonster) {
         survivalLogAdd('\u2728 ' + caster.name + ' [' + evt.skillName + '] 사용', null, true);
       }
+      processEventSounds(evt, G.survivalChars);
       // 비주얼 이펙트
       if (caster) {
         var sPos = _getCachedPos(caster);
@@ -713,6 +719,9 @@ G.socket.on('survivalEnd', function(data) {
       '</div>' +
     '</div>';
   }).join('');
+
+  // 전투 통계 렌더링
+  if (typeof renderBattleStats === 'function') renderBattleStats(data.results);
 });
 
 // ─── 보상 선택 시스템 ───

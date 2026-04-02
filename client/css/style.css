@@ -1722,3 +1722,91 @@ input::placeholder {
 .mvp-name { font-size: var(--fs-body); font-weight: var(--fw-semibold); color: var(--gold-bright); margin: 4px 0; }
 .mvp-value { font-size: var(--fs-small); color: var(--text-secondary); }
 @keyframes mvpPop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* ── Battle Stats ── */
+.battle-stats {
+  width: 100%;
+  max-width: 500px;
+  margin: var(--sp-lg) auto;
+}
+.stats-title {
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-semibold);
+  color: var(--gold);
+  text-align: center;
+  margin-bottom: var(--sp-md);
+}
+.stats-awards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-sm);
+  justify-content: center;
+  margin-bottom: var(--sp-lg);
+}
+.award-badge {
+  padding: 4px 12px;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+}
+.mvp-badge { border-color: var(--gold); color: var(--gold-bright); box-shadow: var(--shadow-glow-gold); }
+.tank-badge { border-color: var(--blue-deep); color: var(--blue); }
+.assassin-badge { border-color: var(--red); color: var(--red); }
+.strategist-badge { border-color: var(--purple); color: var(--purple); }
+.stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--r-md);
+  padding: var(--sp-md);
+  margin-bottom: var(--sp-sm);
+}
+.stat-card.stat-mvp {
+  border-color: var(--gold);
+  box-shadow: inset 0 0 20px rgba(240, 165, 0, 0.08);
+}
+.stat-name {
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-body);
+  margin-bottom: var(--sp-xs);
+}
+.stat-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  margin-bottom: 3px;
+}
+.stat-label {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  width: 42px;
+  flex-shrink: 0;
+}
+.stat-bar-bg {
+  flex: 1;
+  height: 8px;
+  background: var(--bg-deep);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.stat-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.6s var(--ease-out);
+}
+.stat-bar-fill.stat-recv {
+  background: var(--blue-deep);
+}
+.stat-val {
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  width: 40px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.stat-nums {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  margin-top: var(--sp-xs);
+}

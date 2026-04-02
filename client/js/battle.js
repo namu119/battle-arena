@@ -111,6 +111,12 @@ function renderFrame() {
   var isMobile = W < 400;
 
   ctx.clearRect(0, 0, W, H);
+
+  // Screen shake
+  var shake = getShakeOffset(now);
+  ctx.save();
+  ctx.translate(shake.dx, shake.dy);
+
   drawDiamondField(W, H);
 
   var totalChars = G.battleChars.length;
@@ -144,6 +150,8 @@ function renderFrame() {
     }
     drawEffect(ctx, anim, now);
   }
+
+  ctx.restore(); // shake transform end
 }
 
 function animationLoop() {
@@ -206,6 +214,7 @@ G.socket.on('battleTick', function(data) {
         if (pos) {
           spawnDamageNumber(G.animations, pos.qvX, pos.qvY - 20, evt.amount, !!evt.skill, !!evt.crit);
         }
+        processEventSounds(evt, G.battleChars);
         break;
       }
       case 'skill': {
@@ -216,6 +225,7 @@ G.socket.on('battleTick', function(data) {
             return c ? (G.classColors[c.className] || '#7ec8e3') : '#7ec8e3';
           })();
           spawnSkillName(G.animations, casterPos.qvX, casterPos.qvY - 40, evt.skillName);
+          processEventSounds(evt, G.battleChars);
 
           if (evt.aoe) {
             spawnAoeEffect(G.animations, casterPos.qvX, casterPos.qvY, casterColor);
@@ -243,6 +253,7 @@ G.socket.on('battleTick', function(data) {
             spawnDeathEffect(G.animations, G.deathAnims, dpos.qvX, dpos.qvY, dcolor, evt.target);
           }
         }
+        processEventSounds(evt, G.battleChars);
         break;
       }
     }

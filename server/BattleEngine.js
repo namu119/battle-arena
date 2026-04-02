@@ -24,6 +24,7 @@ class BattleEngine {
     this.maxTicks = options.maxTicks || MAX_TICKS;
     this.finishCondition = options.finishCondition || 'lastStanding';
     this.pendingCharacters = [];
+    this.stats = {};
     this.wallBarriers = [];
     this.terrainMap = options.terrainMap || []; // [{col, row, type}] // [{x, active}] - set by orchestrator
     this.zones = []; // 지속 영역 효과 [{x, y, radius, tickDamage, slow, duration, ownerId, ownerTeam, visual}]
@@ -62,6 +63,9 @@ class BattleEngine {
         signalColor: build.signalColor || 'none',
       };
     });
+    for (const char of this.characters) {
+      this.stats[char.id] = { damageDealt: 0, damageReceived: 0, kills: 0, skillsUsed: 0, survivedTicks: 0 };
+    }
   }
 
   /** 중간에 캐릭터 추가 */
@@ -79,6 +83,7 @@ class BattleEngine {
       signalColor: charData.signalColor || 'none',
       skills: (charData.skills || []).map(s => ({ ...s, currentCooldown: s.currentCooldown || 0 })),
     });
+    this.stats[charData.id] = { damageDealt: 0, damageReceived: 0, kills: 0, skillsUsed: 0, survivedTicks: 0 };
   }
 
   /** 전투 전체 실행 */
@@ -189,6 +194,9 @@ class BattleEngine {
     }
 
     // 6. 로그
+    for (const char of this.characters) {
+      if (char.alive && this.stats[char.id]) this.stats[char.id].survivedTicks++;
+    }
     this.log.push({
       tick: this.tick,
       state: this.characters.map(c => ({
@@ -201,6 +209,7 @@ class BattleEngine {
         y: Math.round(c.y),
         alive: c.alive,
         isDecoy: !!c.isDecoy,
+        buffs: (c.buffs || []).slice(0, 4).map(b => ({ type: b.type, dur: b.duration })),
       })),
       zones: this.zones.map(z => ({
         x: Math.round(z.x), y: Math.round(z.y),
@@ -328,6 +337,7 @@ class BattleEngine {
     if (!skillData || skillData.currentCooldown > 0) return;
 
     skillData.currentCooldown = skillData.cooldown;
+    if (this.stats[caster.id]) this.stats[caster.id].skillsUsed++;
 
     this.tickEvents.push({ type: 'skill', caster: caster.id, skillName: skillData.name, skillType: skillData.type, aoe: !!skillData.aoe });
 
@@ -664,11 +674,14 @@ class BattleEngine {
     }
 
     if (tickEvents) tickEvents.push({ type: 'damage', from: attackerId, to: target.id, amount: actual, skill: skillName || null, crit: !!isCrit });
+    if (this.stats[target.id]) this.stats[target.id].damageReceived += actual;
+    if (attackerId && this.stats[attackerId]) this.stats[attackerId].damageDealt += actual;
     if (target.hp <= 0 && target.alive) {
       target.alive = false;
       target.deathTick = this.tick;
       target.killedBy = attackerId;
       if (tickEvents) tickEvents.push({ type: 'death', target: target.id, killedBy: attackerId });
+      if (attackerId && this.stats[attackerId]) this.stats[attackerId].kills++;
     }
   }
 
@@ -696,6 +709,7 @@ class BattleEngine {
     this.results = ranking.map((c, i) => ({
       rank: i + 1, id: c.id, name: c.name, className: c.className,
       alive: c.alive, hpRemaining: c.hp,
+      stats: this.stats[c.id] || null,
     }));
   }
 
@@ -708,6 +722,7 @@ class BattleEngine {
     this.results = sorted.map((c, i) => ({
       rank: i + 1, id: c.id, name: c.name, className: c.className,
       alive: c.alive, hpRemaining: c.hp,
+      stats: this.stats[c.id] || null,
     }));
   }
 

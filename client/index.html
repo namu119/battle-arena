@@ -76,6 +76,7 @@
     <div class="battle-header">
       <h2 class="battle-title">전투 진행중</h2>
       <button class="btn btn-secondary battle-speed-btn" id="speedBtn">1x</button>
+      <button class="btn btn-secondary battle-speed-btn" id="mute-btn" onclick="SoundEngine.toggleMute()">🔊</button>
     </div>
     <div class="hp-bars" id="hpBars"></div>
     <canvas id="battle-canvas"></canvas>
@@ -89,6 +90,7 @@
         <div class="survival-timer" id="survivalTimer">5:00</div>
         <div class="survival-phase" id="survivalPhase">Phase 1 - PvE</div>
         <button class="btn btn-secondary survival-speed-btn" id="survivalSpeedBtn">1x</button>
+        <button class="btn btn-secondary survival-speed-btn" id="mute-btn-survival" onclick="SoundEngine.toggleMute()">🔊</button>
       </div>
       <div class="survival-hud-row">
         <div class="survival-gold" id="survivalGold">💰 0G</div>
@@ -133,10 +135,12 @@
   <div id="result-screen">
     <h2>전투 결과</h2>
     <div id="resultCards"></div>
+    <div id="battleStats" class="battle-stats"></div>
     <button class="btn result-lobby-btn" onclick="backToLobby()">로비로 돌아가기</button>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
+  <script src="js/sound.js"></script>
   <script src="js/app.js"></script>
   <script src="js/renderer.js"></script>
   <script src="js/workshop.js"></script>

@@ -259,3 +259,74 @@ G.socket.on('signalCooldown', function(sec) {
   var label = document.querySelector('.signal-label');
   if (label) label.textContent = '대기 ' + sec + 's';
 });
+
+// ─── 전투 후 통계 렌더링 ───
+function renderBattleStats(results) {
+  var el = document.getElementById('battleStats');
+  if (!el) return;
+
+  // stats가 없는 결과면 표시하지 않음
+  var hasStats = results.some(function(r) { return r.stats; });
+  if (!hasStats) { el.innerHTML = ''; return; }
+
+  var maxDmg = 1;
+  var maxRecv = 1;
+  for (var i = 0; i < results.length; i++) {
+    var s = results[i].stats;
+    if (!s) continue;
+    if (s.damageDealt > maxDmg) maxDmg = s.damageDealt;
+    if (s.damageReceived > maxRecv) maxRecv = s.damageReceived;
+  }
+
+  // MVP: 최다 데미지 딜러
+  var mvpIdx = 0;
+  for (var j = 1; j < results.length; j++) {
+    if (results[j].stats && results[j].stats.damageDealt > (results[mvpIdx].stats ? results[mvpIdx].stats.damageDealt : 0)) mvpIdx = j;
+  }
+
+  // Awards
+  var tankIdx = 0, assassinIdx = 0, strategistIdx = 0;
+  for (var k = 0; k < results.length; k++) {
+    var st = results[k].stats;
+    if (!st) continue;
+    if (st.damageReceived > (results[tankIdx].stats ? results[tankIdx].stats.damageReceived : 0)) tankIdx = k;
+    if (st.kills > (results[assassinIdx].stats ? results[assassinIdx].stats.kills : 0)) assassinIdx = k;
+    if (st.skillsUsed > (results[strategistIdx].stats ? results[strategistIdx].stats.skillsUsed : 0)) strategistIdx = k;
+  }
+
+  var html = '<div class="stats-title">전투 통계</div>';
+
+  // Awards row
+  html += '<div class="stats-awards">';
+  html += '<span class="award-badge mvp-badge">⭐ MVP ' + esc(results[mvpIdx].name) + '</span>';
+  if (results[tankIdx].stats && results[tankIdx].stats.damageReceived > 0) {
+    html += '<span class="award-badge tank-badge">🛡 탱커 ' + esc(results[tankIdx].name) + '</span>';
+  }
+  if (results[assassinIdx].stats && results[assassinIdx].stats.kills > 0) {
+    html += '<span class="award-badge assassin-badge">🗡 암살자 ' + esc(results[assassinIdx].name) + '</span>';
+  }
+  if (results[strategistIdx].stats && results[strategistIdx].stats.skillsUsed > 0) {
+    html += '<span class="award-badge strategist-badge">✨ 전략가 ' + esc(results[strategistIdx].name) + '</span>';
+  }
+  html += '</div>';
+
+  // Per-character stats
+  for (var m = 0; m < results.length; m++) {
+    var r = results[m];
+    var rs = r.stats;
+    if (!rs) continue;
+    var color = G.classColors[r.className] || '#e94560';
+    var dmgPct = maxDmg > 0 ? (rs.damageDealt / maxDmg * 100) : 0;
+    var recvPct = maxRecv > 0 ? (rs.damageReceived / maxRecv * 100) : 0;
+    var isMvp = m === mvpIdx;
+
+    html += '<div class="stat-card' + (isMvp ? ' stat-mvp' : '') + '">';
+    html += '<div class="stat-name" style="color:' + color + '">' + (isMvp ? '⭐ ' : '') + esc(r.name) + ' (' + esc(r.className) + ')</div>';
+    html += '<div class="stat-row"><span class="stat-label">데미지</span><div class="stat-bar-bg"><div class="stat-bar-fill stat-dmg" style="width:' + dmgPct + '%;background:' + color + '"></div></div><span class="stat-val">' + rs.damageDealt + '</span></div>';
+    html += '<div class="stat-row"><span class="stat-label">피해량</span><div class="stat-bar-bg"><div class="stat-bar-fill stat-recv" style="width:' + recvPct + '%"></div></div><span class="stat-val">' + rs.damageReceived + '</span></div>';
+    html += '<div class="stat-nums">킬: ' + rs.kills + ' | 스킬: ' + rs.skillsUsed + ' | 생존: ' + rs.survivedTicks + '틱</div>';
+    html += '</div>';
+  }
+
+  el.innerHTML = html;
+}

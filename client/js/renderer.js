@@ -1,6 +1,26 @@
 // ─── Shared Rendering Functions ───
 var G = window.Game;
 
+// ─── Screen Shake System ───
+G.screenShake = { intensity: 0, until: 0 };
+
+function triggerShake(intensity, durationMs) {
+  var now = performance.now();
+  G.screenShake.intensity = intensity;
+  G.screenShake.until = now + durationMs;
+}
+
+function getShakeOffset(now) {
+  if (now >= G.screenShake.until) return { dx: 0, dy: 0 };
+  var remaining = (G.screenShake.until - now) / 200; // 200ms 기준 감쇠
+  var factor = Math.min(1, remaining);
+  var intensity = G.screenShake.intensity * factor;
+  return {
+    dx: (Math.random() * 2 - 1) * intensity,
+    dy: (Math.random() * 2 - 1) * intensity
+  };
+}
+
 function darkenColor(hex, factor) {
   var r = parseInt(hex.slice(1, 3), 16);
   var g = parseInt(hex.slice(3, 5), 16);
@@ -104,6 +124,112 @@ function drawWeapon(ctx, className, bodyW, bodyTop, baseSize, color) {
   }
 }
 
+// ─── Buff Icon Rendering ───
+var BUFF_ICON_COLORS = {
+  shield: '#4488ff', speedBoost: '#ffdd44', thorns: '#a855f7',
+  dodge: '#2ecc71', buff: '#a855f7', slow: '#44bbff',
+  stun: '#ffdd44', dot: '#e94560'
+};
+
+function drawBuffIcons(ctx, buffs, x, y, scale) {
+  var iconSize = Math.max(4, 6 * scale);
+  var gap = iconSize + 2;
+  var maxIcons = 4;
+  var count = Math.min(buffs.length, maxIcons);
+  var totalW = count * gap - 2;
+  var startX = x - totalW / 2;
+
+  ctx.save();
+  for (var i = 0; i < count; i++) {
+    var b = buffs[i];
+    var bx = startX + i * gap + iconSize / 2;
+    var by = y - iconSize / 2;
+    var bColor = BUFF_ICON_COLORS[b.type] || '#aaa';
+    ctx.fillStyle = bColor;
+    ctx.strokeStyle = bColor;
+    ctx.lineWidth = 1;
+
+    switch (b.type) {
+      case 'shield':
+        ctx.fillRect(bx - iconSize * 0.35, by - iconSize * 0.4, iconSize * 0.7, iconSize * 0.8);
+        break;
+      case 'speedBoost':
+        ctx.beginPath();
+        ctx.moveTo(bx - iconSize * 0.3, by - iconSize * 0.4);
+        ctx.lineTo(bx + iconSize * 0.4, by);
+        ctx.lineTo(bx - iconSize * 0.3, by + iconSize * 0.4);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      case 'thorns':
+        ctx.beginPath();
+        ctx.moveTo(bx, by - iconSize * 0.4);
+        ctx.lineTo(bx + iconSize * 0.35, by + iconSize * 0.3);
+        ctx.lineTo(bx - iconSize * 0.35, by + iconSize * 0.3);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      case 'dodge':
+        ctx.beginPath();
+        ctx.moveTo(bx, by - iconSize * 0.4);
+        ctx.lineTo(bx + iconSize * 0.3, by);
+        ctx.lineTo(bx, by + iconSize * 0.4);
+        ctx.lineTo(bx - iconSize * 0.3, by);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      case 'buff':
+        ctx.beginPath();
+        ctx.moveTo(bx, by - iconSize * 0.4);
+        ctx.lineTo(bx + iconSize * 0.3, by + iconSize * 0.2);
+        ctx.lineTo(bx - iconSize * 0.3, by + iconSize * 0.2);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      case 'slow':
+        ctx.beginPath();
+        ctx.moveTo(bx - iconSize * 0.3, by);
+        ctx.quadraticCurveTo(bx - iconSize * 0.1, by - iconSize * 0.3, bx + iconSize * 0.1, by);
+        ctx.quadraticCurveTo(bx + iconSize * 0.3, by + iconSize * 0.3, bx + iconSize * 0.4, by);
+        ctx.stroke();
+        break;
+      default: // stun, dot, etc
+        ctx.beginPath();
+        ctx.arc(bx, by, iconSize * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+    }
+  }
+  if (buffs.length > maxIcons) {
+    ctx.fillStyle = '#aaa';
+    ctx.font = Math.max(7, Math.round(8 * scale)) + 'px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('+' + (buffs.length - maxIcons), startX + count * gap, y);
+  }
+  ctx.restore();
+}
+
+// ─── Shared Event Sound/Effect Triggers ───
+function processEventSounds(evt, charList) {
+  switch (evt.type) {
+    case 'damage':
+      if (evt.amount <= 0) break;
+      var hitChar = charList.find(function(ch) { return ch.id === evt.to; });
+      if (hitChar) hitChar.hitFlashUntil = performance.now() + 100;
+      if (evt.crit) { SoundEngine.playCrit(); }
+      else { SoundEngine.playHit(); }
+      break;
+    case 'skill':
+      SoundEngine.playSkill();
+      var sFx = typeof SKILL_FX !== 'undefined' ? SKILL_FX[evt.skillName] : null;
+      if (sFx && sFx.shake) triggerShake(4, 200);
+      break;
+    case 'death':
+      SoundEngine.playDeath();
+      break;
+  }
+}
+
 function drawCharacter(ctx, char, qvX, qvY, scale, deathProgress) {
   var _sigMap = {red:'#e94560',blue:'#3498db',green:'#2ecc71',yellow:'#f0a500',purple:'#a855f7'};
   var _hasSig = char.signalColor && char.signalColor !== 'none' && _sigMap[char.signalColor];
@@ -177,6 +303,14 @@ function drawCharacter(ctx, char, qvX, qvY, scale, deathProgress) {
   // Weapon
   drawWeapon(ctx, char.className, bodyW, bodyTop, baseSize, color);
 
+  // Hit flash overlay
+  if (char.hitFlashUntil && performance.now() < char.hitFlashUntil) {
+    ctx.globalCompositeOperation = 'source-atop';
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.fillRect(-bodyW * 0.5, headY - headR, bodyW, -headY + headR + legH);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
   ctx.restore();
 
   // Signal color marker (glow ring under character)
@@ -209,6 +343,11 @@ function drawCharacter(ctx, char, qvX, qvY, scale, deathProgress) {
     var hpColor = hpRatio > 0.5 ? '#2ecc71' : hpRatio > 0.25 ? '#f39c12' : '#e94560';
     ctx.fillStyle = hpColor;
     ctx.fillRect(qvX - barW/2, barY, barW * hpRatio, barH);
+
+    // Buff icons above HP bar
+    if (char.buffs && char.buffs.length > 0) {
+      drawBuffIcons(ctx, char.buffs, qvX, barY - 2, scale);
+    }
   }
 
   // Name label

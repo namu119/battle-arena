@@ -735,6 +735,7 @@ class SurvivalArena {
       monstersKilled: this.engine.characters.filter(m => m.isMonster && !m.alive && m.killedBy === c.id).length,
       livesRemaining: this.respawnLives.get(c.id) || 0,
       bossKiller: c.id === this.bossKiller,
+      stats: this.engine.stats[c.id] || null,
     }));
   }
 
@@ -787,6 +788,7 @@ class SurvivalArena {
       enhancementLevels: c.enhancementLevels || {},
       monstersKilled: this.engine.characters.filter(m => m.isMonster && !m.alive && m.killedBy === c.id).length,
       livesRemaining: this.respawnLives.get(c.id) || 0,
+      stats: this.engine.stats[c.id] || null,
     }));
   }
 
@@ -809,6 +811,7 @@ class SurvivalArena {
       enhancementLevels: c.enhancementLevels || {},
       monstersKilled: this.engine.characters.filter(m => m.isMonster && !m.alive && m.killedBy === c.id).length,
       livesRemaining: this.respawnLives.get(c.id) || 0,
+      stats: this.engine.stats[c.id] || null,
     }));
   }
 }
