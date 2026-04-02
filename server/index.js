@@ -130,7 +130,18 @@ function createRoom(id, creatorSocketId, creatorName) {
     ],
     state: 'waiting', // waiting | building | playing
     hostSocketId: creatorSocketId,
+    // 게임 상태 (room 공유 — 모든 소켓이 접근)
+    arena: null,
+    activeInterval: null,
+    rewardTimeout: null,
+    gameSpeed: 1,
   };
+}
+
+/** 소켓 ID → 플레이어 ID 매핑 (슬롯 순서 기반) */
+function getPlayerId(room, socketId) {
+  const idx = room.slots.findIndex(s => s.socketId === socketId);
+  return idx >= 0 ? `p${idx}` : null;
 }
 
 function getRoomList() {
@@ -161,7 +172,6 @@ function broadcastRoomList() {
 io.on('connection', (socket) => {
   console.log(`접속: ${socket.id}`);
   let currentRoomId = null;
-  let activeInterval = null;
 
   // 접속 시 방 목록 전송
   socket.emit('roomList', getRoomList());
@@ -274,10 +284,6 @@ io.on('connection', (socket) => {
 
   // 연결 해제
   socket.on('disconnect', () => {
-    if (activeInterval) {
-      clearInterval(activeInterval);
-      activeInterval = null;
-    }
     if (currentRoomId) {
       const room = rooms.get(currentRoomId);
       if (room) {
@@ -306,43 +312,38 @@ io.on('connection', (socket) => {
   // ─── 서바이벌 실행 (방에서 트리거) ───
   // 보상 선택 소켓
   socket.on('rerollReward', () => {
-    if (!currentArena || !currentArena.pendingRewards) return;
-    const newRewards = currentArena.rerollRewards();
+    const room = rooms.get(currentRoomId);
+    if (!room || !room.arena || !room.arena.pendingRewards) return;
+    const newRewards = room.arena.rerollRewards();
     if (newRewards) {
       socket.emit('rewardChoice', { rewards: newRewards });
     }
   });
 
   socket.on('selectReward', ({ rewardIndex }) => {
-    if (!currentArena || !currentArena.pendingRewards) return;
-    const playerId = 'p0'; // 인간 플레이어는 항상 p0
-    currentArena.applyReward(playerId, rewardIndex);
+    const room = rooms.get(currentRoomId);
+    if (!room || !room.arena || !room.arena.pendingRewards) return;
+    const playerId = getPlayerId(room, socket.id);
+    if (!playerId) return;
+    room.arena.applyReward(playerId, rewardIndex);
     // AI도 자동 선택
-    for (const char of currentArena.engine.characters) {
+    for (const char of room.arena.engine.characters) {
       if (char.isMonster || char.id === playerId || !char.alive) continue;
-      const bestIdx = currentArena._aiBestReward(char);
-      currentArena.applyReward(char.id, bestIdx);
+      const bestIdx = room.arena._aiBestReward(char);
+      room.arena.applyReward(char.id, bestIdx);
     }
-    currentArena.clearRewards();
+    room.arena.clearRewards();
     // 시뮬레이션 재개
-    resumeSurvival();
+    resumeSurvival(room);
   });
-
-  let currentArena = null;
-  let currentRoom = null;
-  let rewardTimeout = null;
-
-  let Game_speed = 1;
   function startSurvivalFromRoom(room) {
-    if (activeInterval) { clearInterval(activeInterval); activeInterval = null; }
+    if (room.activeInterval) { clearInterval(room.activeInterval); room.activeInterval = null; }
     try {
       room.state = 'playing';
-      currentRoom = room;
       const allBuilds = room.slots.map(s => s.build);
       console.log(`서바이벌 시작: ${allBuilds.map(b => b.playerName + '(' + b.className + ')').join(', ')}`);
 
-      currentArena = new SurvivalArena(allBuilds);
-      currentTickMode = 'survival';
+      room.arena = new SurvivalArena(allBuilds);
 
       const playerSockets = room.slots
         .filter(s => s.type === 'player' && s.socketId)
@@ -350,97 +351,101 @@ io.on('connection', (socket) => {
 
       for (const sid of playerSockets) {
         const psock = io.sockets.sockets.get(sid);
-        if (psock) psock.emit('survivalStart', { totalTicks: 1500, zones: [0,1,2,3], playerZone: 0 });
+        if (psock) psock.emit('survivalStart', { totalTicks: 1500, zones: [0,1,2,3], playerZone: room.slots.findIndex(sl => sl.socketId === sid) });
       }
 
       // 단계별 시뮬레이션 시작
-      runSurvivalSegment();
+      runSurvivalSegment(room);
     } catch (e) {
       console.error('서바이벌 에러:', e);
       socket.emit('error', '서바이벌 시작 실패: ' + e.message);
     }
   }
 
-  function getPlayerSockets() {
-    if (!currentRoom) return [];
-    return currentRoom.slots
+  function getPlayerSockets(room) {
+    if (!room) return [];
+    return room.slots
       .filter(s => s.type === 'player' && s.socketId)
       .map(s => s.socketId);
   }
 
-  function emitToPlayers(event, data) {
-    for (const sid of getPlayerSockets()) {
+  function emitToPlayers(room, event, data) {
+    for (const sid of getPlayerSockets(room)) {
       const psock = io.sockets.sockets.get(sid);
       if (psock) psock.emit(event, data);
     }
   }
 
-  function runSurvivalSegment() {
-    if (!currentArena || currentArena.finished) return;
+  function runSurvivalSegment(room) {
+    if (!room || !room.arena || room.arena.finished) return;
 
     // 100틱씩 실행 (보상 체크 포함)
-    const result = currentArena.runUntilTick(currentArena.tick + 100);
+    const result = room.arena.runUntilTick(room.arena.tick + 100);
 
     // 새 로그 틱을 스트리밍
     let tickIdx = 0;
-    activeInterval = setInterval(() => {
+    room.activeInterval = setInterval(() => {
       if (tickIdx >= result.newLog.length) {
-        clearInterval(activeInterval);
-        activeInterval = null;
+        clearInterval(room.activeInterval);
+        room.activeInterval = null;
 
         // 게임 종료?
         if (result.finished) {
-          emitToPlayers('survivalEnd', { results: result.results });
-          cleanupRoom();
+          emitToPlayers(room, 'survivalEnd', { results: result.results });
+          cleanupRoom(room);
           return;
         }
 
         // 보상 선택 대기?
-        if (currentArena.pendingRewards) {
-          emitToPlayers('rewardChoice', { rewards: currentArena.pendingRewards });
+        if (room.arena.pendingRewards) {
+          emitToPlayers(room, 'rewardChoice', { rewards: room.arena.pendingRewards });
           // 8초 타임아웃: 미선택시 자동 선택
-          rewardTimeout = setTimeout(() => {
-            if (currentArena && currentArena.pendingRewards) {
-              currentArena._autoSelectAllRewards();
-              emitToPlayers('rewardAutoSelected', {});
-              resumeSurvival();
+          room.rewardTimeout = setTimeout(() => {
+            if (room.arena && room.arena.pendingRewards) {
+              room.arena._autoSelectAllRewards();
+              emitToPlayers(room, 'rewardAutoSelected', {});
+              resumeSurvival(room);
             }
           }, 8000);
           return;
         }
 
         // 다음 세그먼트
-        runSurvivalSegment();
+        runSurvivalSegment(room);
         return;
       }
       // Overlay live signalColor/pvpStance onto pre-computed tick data
-          var tickData = result.newLog[tickIdx];
-          if (tickData && tickData.state && currentArena) {
-            for (var si = 0; si < tickData.state.length; si++) {
-              var liveChar = currentArena.engine.characters.find(function(ch) { return ch.id === tickData.state[si].id; });
-              if (liveChar) {
-                tickData.state[si].signalColor = liveChar.signalColor || 'none';
-                tickData.state[si].pvpStance = liveChar.pvpStance || 'retaliate';
-              }
-            }
+      var tickData = result.newLog[tickIdx];
+      if (tickData && tickData.state && room.arena) {
+        for (var si = 0; si < tickData.state.length; si++) {
+          var liveChar = room.arena.engine.characters.find(function(ch) { return ch.id === tickData.state[si].id; });
+          if (liveChar) {
+            tickData.state[si].signalColor = liveChar.signalColor || 'none';
+            tickData.state[si].pvpStance = liveChar.pvpStance || 'retaliate';
           }
-          emitToPlayers('survivalTick', tickData);
+        }
+      }
+      emitToPlayers(room, 'survivalTick', tickData);
       tickIdx++;
-    }, TICK_INTERVAL / (Game_speed || 1));
+    }, TICK_INTERVAL / (room.gameSpeed || 1));
   }
 
   // 배속 업데이트
   socket.on('setSpeed', (speed) => {
+    const room = rooms.get(currentRoomId);
     const validSpeeds = [1, 2, 4];
-    if (validSpeeds.includes(speed)) Game_speed = speed;
+    if (room && validSpeeds.includes(speed)) room.gameSpeed = speed;
   });
 
   // PvP 성향 변경 (전투 중)
   socket.on('setPvpStance', (stance) => {
     const valid = ['passive', 'hostile', 'retaliate'];
     if (!valid.includes(stance)) return;
-    if (!currentArena) return;
-    const char = currentArena.engine.characters.find(c => c.id === 'p0');
+    const room = rooms.get(currentRoomId);
+    if (!room || !room.arena) return;
+    const playerId = getPlayerId(room, socket.id);
+    if (!playerId) return;
+    const char = room.arena.engine.characters.find(c => c.id === playerId);
     if (char) {
       char.pvpStance = stance;
       console.log(`PvP 성향 변경: ${char.name} → ${stance}`);
@@ -452,13 +457,16 @@ io.on('connection', (socket) => {
   socket.on('setSignalColor', (color) => {
     const validColors = ['none', 'red', 'blue', 'green', 'yellow', 'purple'];
     if (!validColors.includes(color)) return;
-    if (!currentArena) return;
+    const room = rooms.get(currentRoomId);
+    if (!room || !room.arena) return;
     const now = Date.now();
     if (now < signalCooldown) {
       socket.emit('signalCooldown', Math.ceil((signalCooldown - now) / 1000));
       return;
     }
-    const char = currentArena.engine.characters.find(c => c.id === 'p0');
+    const playerId = getPlayerId(room, socket.id);
+    if (!playerId) return;
+    const char = room.arena.engine.characters.find(c => c.id === playerId);
     if (char) {
       char.signalColor = color;
       signalCooldown = now + 5000;
@@ -467,29 +475,28 @@ io.on('connection', (socket) => {
     }
   });
 
-  function resumeSurvival() {
-    if (rewardTimeout) { clearTimeout(rewardTimeout); rewardTimeout = null; }
-    runSurvivalSegment();
+  function resumeSurvival(room) {
+    if (room.rewardTimeout) { clearTimeout(room.rewardTimeout); room.rewardTimeout = null; }
+    runSurvivalSegment(room);
   }
 
-  function cleanupRoom() {
-    if (currentRoom) {
-      // 방 삭제 (게임 끝나면 방 제거)
-      rooms.delete(currentRoom.id);
+  function cleanupRoom(room) {
+    if (room) {
+      if (room.activeInterval) { clearInterval(room.activeInterval); room.activeInterval = null; }
+      if (room.rewardTimeout) { clearTimeout(room.rewardTimeout); room.rewardTimeout = null; }
       // 모든 플레이어 소켓의 currentRoomId 초기화
-      for (const s of currentRoom.slots) {
+      for (const s of room.slots) {
         if (s.type === 'player' && s.socketId) {
           const psock = io.sockets.sockets.get(s.socketId);
-          // 클라이언트에 로비로 돌아가라고 알림
           if (psock) psock.emit('gameOver');
         }
       }
+      room.arena = null;
+      // 방 삭제
+      rooms.delete(room.id);
       broadcastRoomList();
     }
-    currentArena = null;
-    currentRoom = null;
     currentRoomId = null;
-    if (rewardTimeout) { clearTimeout(rewardTimeout); rewardTimeout = null; }
   }
 });
 
