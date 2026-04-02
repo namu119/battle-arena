@@ -91,6 +91,7 @@ class SurvivalArena {
 
   /** 특정 틱까지 실행 (인터랙티브 모드) */
   runUntilTick(targetTick) {
+    this.engine._trimDeadMonsters = true; // 인터랙티브 모드: 죽은 몬스터 정리 활성화
     const startLog = this.log.length;
     while (!this.finished && this.tick < targetTick && this.tick < MAX_SURVIVAL_TICKS) {
       this.processTick();
@@ -100,7 +101,10 @@ class SurvivalArena {
       }
     }
     if (!this.finished && this.tick >= MAX_SURVIVAL_TICKS) this._finishByHP();
-    return { newLog: this.log.slice(startLog), finished: this.finished, results: this.results };
+    const newLog = this.log.slice(startLog);
+    // 전송 완료된 로그 trim (메모리 누수 방지)
+    if (startLog > 0) this.log = this.log.slice(startLog);
+    return { newLog, finished: this.finished, results: this.results };
   }
 
   /** 보상 시점 체크: 웨이브 몬스터 전멸 시 */
@@ -210,6 +214,10 @@ class SurvivalArena {
     const reward = this.pendingRewards[rewardIndex] || this.pendingRewards[0];
     const char = this.engine.characters.find(c => c.id === playerId);
     if (!char || char.isMonster) return;
+    // 이중 적용 방지: 보상 받은 플레이어 추적
+    if (!this._rewardedPlayers) this._rewardedPlayers = new Set();
+    if (this._rewardedPlayers.has(playerId)) return;
+    this._rewardedPlayers.add(playerId);
     this._applyEffect(char, reward.effect);
     this.metaEvents.push({ type: 'rewardApplied', playerId, playerName: char.name, reward: reward.name, icon: reward.icon });
   }
@@ -219,11 +227,13 @@ class SurvivalArena {
     if (!this.pendingRewards) return;
     for (const char of this.engine.characters) {
       if (char.isMonster || !char.alive) continue;
+      if (this._rewardedPlayers && this._rewardedPlayers.has(char.id)) continue; // 이미 보상 받은 플레이어 제외
       // AI: 자기 빌드에 맞는 보상 선택
       const bestIdx = this._aiBestReward(char);
       this._applyEffect(char, this.pendingRewards[bestIdx].effect);
     }
     this.pendingRewards = null;
+    this._rewardedPlayers = null;
   }
 
   /** 보상 선택 완료 (인터랙티브 모드) */
@@ -579,7 +589,9 @@ class SurvivalArena {
           char.x = rsp.spawnX;
           char.y = ARENA_HEIGHT / 2;
           char.buffs = [];
+          char.dots = [];
           char.killedBy = null;
+          char._attackedBy = null;
           // Reset skill cooldowns
           for (const s of char.skills) s.currentCooldown = 0;
           this.metaEvents.push({
@@ -638,11 +650,10 @@ class SurvivalArena {
       }
     }
 
-    // Update chaos levels on characters (playerKills → chaos)
+    // Update chaos levels from tracked kills (O(1) per character)
     for (const char of this.engine.characters) {
       if (char.isMonster) continue;
-      const kills = this.engine.characters.filter(c => !c.isMonster && !c.alive && c.killedBy === char.id).length;
-      char.chaos = kills * 30;
+      char.chaos = (this._playerKills.get(char.id) || 0) * 30;
     }
   }
 
@@ -652,10 +663,10 @@ class SurvivalArena {
     if (!boss || !boss._bossPhases) return;
 
     const hpRatio = boss.hp / boss.stats.maxHP;
-    let newPhaseIdx = 0;
+    let newPhaseIdx = boss._currentPhase || 0;
     for (let i = boss._bossPhases.length - 1; i >= 0; i--) {
       if (hpRatio <= boss._bossPhases[i].hpThreshold) {
-        newPhaseIdx = i;
+        newPhaseIdx = Math.max(newPhaseIdx, i); // 페이즈 역행 방지
         break;
       }
     }
@@ -732,7 +743,7 @@ class SurvivalArena {
       hpRemaining: c.hp,
       gold: c.gold || 0,
       enhancementLevels: c.enhancementLevels || {},
-      monstersKilled: this.engine.characters.filter(m => m.isMonster && !m.alive && m.killedBy === c.id).length,
+      monstersKilled: (this.engine._monsterKillCounts ? this.engine._monsterKillCounts[c.id] || 0 : 0) + this.engine.characters.filter(m => m.isMonster && !m.alive && m.killedBy === c.id).length,
       livesRemaining: this.respawnLives.get(c.id) || 0,
       bossKiller: c.id === this.bossKiller,
       stats: this.engine.stats[c.id] || null,
@@ -786,7 +797,7 @@ class SurvivalArena {
       hpRemaining: c.hp,
       gold: c.gold || 0,
       enhancementLevels: c.enhancementLevels || {},
-      monstersKilled: this.engine.characters.filter(m => m.isMonster && !m.alive && m.killedBy === c.id).length,
+      monstersKilled: (this.engine._monsterKillCounts ? this.engine._monsterKillCounts[c.id] || 0 : 0) + this.engine.characters.filter(m => m.isMonster && !m.alive && m.killedBy === c.id).length,
       livesRemaining: this.respawnLives.get(c.id) || 0,
       stats: this.engine.stats[c.id] || null,
     }));
@@ -809,7 +820,7 @@ class SurvivalArena {
       hpRemaining: c.hp,
       gold: c.gold || 0,
       enhancementLevels: c.enhancementLevels || {},
-      monstersKilled: this.engine.characters.filter(m => m.isMonster && !m.alive && m.killedBy === c.id).length,
+      monstersKilled: (this.engine._monsterKillCounts ? this.engine._monsterKillCounts[c.id] || 0 : 0) + this.engine.characters.filter(m => m.isMonster && !m.alive && m.killedBy === c.id).length,
       livesRemaining: this.respawnLives.get(c.id) || 0,
       stats: this.engine.stats[c.id] || null,
     }));

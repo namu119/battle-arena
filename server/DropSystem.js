@@ -179,7 +179,13 @@ class DropSystem {
       player.stats[key] = (player.baseStats[key] || 0) + (player.equipmentBonuses[key] || 0);
     }
     // maxHP scales with DEF bonus
+    var oldMaxHP = player.stats.maxHP || 0;
     player.stats.maxHP = (player.baseStats.maxHP || 0) + (player.equipmentBonuses.DEF || 0) * 5;
+    // HP도 maxHP 증가분만큼 함께 증가
+    var diff = player.stats.maxHP - oldMaxHP;
+    if (diff > 0 && player.hp != null) {
+      player.hp = Math.min(player.stats.maxHP, player.hp + diff);
+    }
   }
 }
 

@@ -193,15 +193,18 @@ function backToLobby() {
 }
 
 // 게임 종료 → 로비로 자동 복귀
+var _gameOverTimer = null;
 G.socket.on('gameOver', function() {
+  if (_gameOverTimer) clearInterval(_gameOverTimer);
   var remaining = 10;
   var btn = document.querySelector('.result-lobby-btn');
   if (btn) btn.textContent = '로비로 돌아가기 (' + remaining + ')';
-  var timer = setInterval(function() {
+  _gameOverTimer = setInterval(function() {
     remaining--;
     if (btn) btn.textContent = '로비로 돌아가기 (' + remaining + ')';
     if (remaining <= 0) {
-      clearInterval(timer);
+      clearInterval(_gameOverTimer);
+      _gameOverTimer = null;
       backToLobby();
     }
   }, 1000);

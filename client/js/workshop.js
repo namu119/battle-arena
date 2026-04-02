@@ -34,7 +34,6 @@ function randomizeClass() {
   var keys = ['ATK','DEF','INT','SPD'];
   var remaining = 10;
   while (remaining > 0) {
-    keys[Math.floor(Math.random() * keys.length)];
     stats[keys[Math.floor(Math.random() * keys.length)]]++;
     remaining--;
   }
@@ -258,7 +257,6 @@ function getTotalCost() {
   for (var slot in equip) {
     if (!equip[slot]) continue;
     var cat = G.equipData[slotCategory[slot]];
-    if (cat && cat[slot]) cost += cat[slot].cost;
     if (cat && cat[equip[slot]]) cost += cat[equip[slot]].cost;
   }
   return cost;

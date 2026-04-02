@@ -303,12 +303,13 @@ function drawCharacter(ctx, char, qvX, qvY, scale, deathProgress) {
   // Weapon
   drawWeapon(ctx, char.className, bodyW, bodyTop, baseSize, color);
 
-  // Hit flash overlay
+  // Hit flash overlay (safe save/restore to avoid compositeOperation leak)
   if (char.hitFlashUntil && performance.now() < char.hitFlashUntil) {
+    ctx.save();
     ctx.globalCompositeOperation = 'source-atop';
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
     ctx.fillRect(-bodyW * 0.5, headY - headR, bodyW, -headY + headR + legH);
-    ctx.globalCompositeOperation = 'source-over';
+    ctx.restore();
   }
 
   ctx.restore();

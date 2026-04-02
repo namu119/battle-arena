@@ -188,9 +188,21 @@ class BattleEngine {
       if (alive.length <= 1) this.finishBattle(alive);
     }
 
-    // 5.5 죽은 잔상 정리 (매 10틱)
+    // 5.5 죽은 잔상 + 죽은 몬스터 정리 (매 10틱, external 모드만)
     if (this.tick % 10 === 0) {
-      this.characters = this.characters.filter(c => c.alive || !c.isDecoy);
+      this.characters = this.characters.filter(c => {
+        if (c.alive) return true;
+        if (c.isDecoy) return false; // 죽은 잔상 제거
+        // 죽은 몬스터: 인터랙티브 모드에서만 정리 (메모리 절약)
+        if (c.isMonster && this._trimDeadMonsters) {
+          if (c.killedBy) {
+            if (!this._monsterKillCounts) this._monsterKillCounts = {};
+            this._monsterKillCounts[c.killedBy] = (this._monsterKillCounts[c.killedBy] || 0) + 1;
+          }
+          return false;
+        }
+        return true;
+      });
     }
 
     // 6. 로그
@@ -314,17 +326,17 @@ class BattleEngine {
       damage *= (1 - target.passive.effect.damageReduction);
     }
 
-    // 가시(thorns) 반사
-    const thorns = target.buffs.find(b => b.type === 'thorns');
-    if (thorns) {
-      this.applyDamage(attacker, thorns.value, target.id, '가시반사', this.tickEvents);
-    }
-
-    // 회피(dodge) 체크
+    // 회피(dodge) 체크 — 가시반사보다 먼저 (회피 시 가시 미적용)
     const dodgeBuff = target.buffs.find(b => b.type === 'dodge');
     if (dodgeBuff && Math.random() < dodgeBuff.value) {
       this.tickEvents.push({ type: 'dodge', target: target.id, from: attacker.id });
       return;
+    }
+
+    // 가시(thorns) 반사
+    const thorns = target.buffs.find(b => b.type === 'thorns');
+    if (thorns) {
+      this.applyDamage(attacker, thorns.value, target.id, '가시반사', this.tickEvents);
     }
 
     damage = Math.round(damage);
@@ -336,7 +348,7 @@ class BattleEngine {
     const skillData = caster.skills.find(s => s.name === skill.name);
     if (!skillData || skillData.currentCooldown > 0) return;
 
-    skillData.currentCooldown = skillData.cooldown;
+    skillData.currentCooldown = skillData.cooldown + 1; // +1: 같은 틱에서 updateCooldowns가 1 감소시키므로
     if (this.stats[caster.id]) this.stats[caster.id].skillsUsed++;
 
     this.tickEvents.push({ type: 'skill', caster: caster.id, skillName: skillData.name, skillType: skillData.type, aoe: !!skillData.aoe });

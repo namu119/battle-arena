@@ -540,8 +540,7 @@ G.socket.on('survivalTick', function(data) {
         G.survivalAnimations.push({ type:'damage', x:pos.qvX, y:pos.qvY-15, startY:pos.qvY-15, amount:evt.amount, isSkill:!!evt.skill, isCrit:!!evt.crit, born:performance.now(), duration:evt.crit?1200:1000 });
       }
       // Sound + hit flash
-      if (!target || !target.isMonster) processEventSounds(evt, G.survivalChars);
-      else if (target) target.hitFlashUntil = performance.now() + 100;
+      processEventSounds(evt, G.survivalChars);
       if (evt.amount >= 5 || evt.skill || evt.crit) {
         var aName = attacker ? attacker.name : '?';
         var tName = target ? target.name : '?';
