@@ -351,7 +351,7 @@ io.on('connection', (socket) => {
 
       for (const sid of playerSockets) {
         const psock = io.sockets.sockets.get(sid);
-        if (psock) psock.emit('survivalStart', { totalTicks: 1500, zones: [0,1,2,3], playerZone: room.slots.findIndex(sl => sl.socketId === sid) });
+        if (psock) psock.emit('survivalStart', { totalTicks: 1500, zones: [0,1,2,3], playerZone: room.slots.findIndex(sl => sl.socketId === sid), terrainMap: room.arena.terrainMap || [] });
       }
 
       // 단계별 시뮬레이션 시작
